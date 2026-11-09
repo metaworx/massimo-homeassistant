@@ -1,0 +1,78 @@
+# The integration's checks: Home Assistant's hassfest and HACS's
+# validation, ruff, and the tests against a real Massimo server built from
+# metaworx/massimo (main, or the ref given to a manual run).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      massimo_ref:
+        description: Massimo's branch, tag or commit to test against
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  hassfest:
+    name: hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361 # master of 2026-10-26
+
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
+        with:
+          category: integration
+          # No brand images in home-assistant/brands yet, and no topics on
+          # the repository yet: both come with the release (Block 9).
+          ignore: brands topics
+
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - run: pip install ruff==0.17.4
+      - run: ruff check custom_components tests
+      - run: ruff format --check custom_components tests
+
+  test:
+    name: Tests against Massimo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: metaworx/massimo
+          ref: ${{ inputs.massimo_ref || 'main' }}
+          path: massimo
+          submodules: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: massimo/go.mod
+          cache-dependency-path: massimo/go.sum
+      - name: Build massimo
+        working-directory: massimo
+        run: CGO_ENABLED=0 go build -o "$RUNNER_TEMP/massimo" ./cmd/massimo
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements_test.txt
+      - run: pip install -r requirements_test.txt
+      - name: pytest
+        env:
+          MASSIMO_REQUIRED: "1"
+          MASSIMO_GREETING: ${{ github.workspace }}/massimo/tools/ui-test/greeting.txt
+        run: MASSIMO_BIN="$RUNNER_TEMP/massimo" python -m pytest -v -rs
