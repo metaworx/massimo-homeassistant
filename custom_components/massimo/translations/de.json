@@ -1,0 +1,52 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Massimo",
+        "description": "Der Massimo-Server, der Ihre MAX! Cubes hält.",
+        "data": {
+          "url": "URL",
+          "api_key": "API-Schlüssel",
+          "verify_ssl": "Zertifikat prüfen"
+        },
+        "data_description": {
+          "url": "Die Adresse, unter der ein Browser die Weboberfläche von Massimo öffnet, mit Schema und Port",
+          "api_key": "Ein API-Schlüssel eines Massimo-Benutzers mit der Rolle integration (Systemeinstellungen → Benutzer); leer für einen Server ohne Benutzer",
+          "verify_ssl": "Nur aus für einen Server mit selbst erstelltem Zertifikat"
+        }
+      },
+      "zeroconf_confirm": {
+        "title": "Massimo",
+        "description": "Massimo {name} wurde unter {url} gefunden. Geben Sie einen API-Schlüssel an, um es einzurichten.",
+        "data": {
+          "api_key": "API-Schlüssel"
+        },
+        "data_description": {
+          "api_key": "Ein API-Schlüssel eines Massimo-Benutzers mit der Rolle integration (Systemeinstellungen → Benutzer); leer für einen Server ohne Benutzer"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Massimo",
+        "description": "Der API-Schlüssel für {url} gilt nicht mehr. Geben Sie einen neuen an.",
+        "data": {
+          "api_key": "API-Schlüssel"
+        },
+        "data_description": {
+          "api_key": "Ein API-Schlüssel eines Massimo-Benutzers mit der Rolle integration (Systemeinstellungen → Benutzer); leer für einen Server ohne Benutzer"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Der Server ist nicht erreichbar.",
+      "invalid_auth": "Der API-Schlüssel ist falsch, widerrufen oder darf nicht lesen.",
+      "unknown": "Der Server hat unerwartet geantwortet."
+    },
+    "abort": {
+      "already_configured": "Dieser Server ist bereits eingerichtet.",
+      "not_massimo": "Das ist kein Massimo-Server.",
+      "wrong_server": "Der Schlüssel gehört zu einem anderen Server.",
+      "reauth_successful": "Der neue API-Schlüssel funktioniert."
+    }
+  }
+}

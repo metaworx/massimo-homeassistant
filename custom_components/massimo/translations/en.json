@@ -1,0 +1,52 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Massimo",
+        "description": "The Massimo server that holds your MAX! Cubes.",
+        "data": {
+          "url": "URL",
+          "api_key": "API key",
+          "verify_ssl": "Verify the certificate"
+        },
+        "data_description": {
+          "url": "The address at which a browser opens Massimo's web UI, with its scheme and port",
+          "api_key": "An API key of a Massimo user with the role integration (System settings → Users); empty for a server without users",
+          "verify_ssl": "Off only for a server whose certificate it made itself"
+        }
+      },
+      "zeroconf_confirm": {
+        "title": "Massimo",
+        "description": "Massimo {name} was found at {url}. Give it an API key to set it up.",
+        "data": {
+          "api_key": "API key"
+        },
+        "data_description": {
+          "api_key": "An API key of a Massimo user with the role integration (System settings → Users); empty for a server without users"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Massimo",
+        "description": "The API key for {url} no longer works. Give a new one.",
+        "data": {
+          "api_key": "API key"
+        },
+        "data_description": {
+          "api_key": "An API key of a Massimo user with the role integration (System settings → Users); empty for a server without users"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "The server cannot be reached.",
+      "invalid_auth": "The API key is wrong, revoked, or may not read.",
+      "unknown": "The server answered unexpectedly."
+    },
+    "abort": {
+      "already_configured": "This server is already set up.",
+      "not_massimo": "This is not a Massimo server.",
+      "wrong_server": "The key belongs to another server.",
+      "reauth_successful": "The new API key works."
+    }
+  }
+}

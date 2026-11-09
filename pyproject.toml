@@ -1,0 +1,8 @@
+# Lint settings only: the integration is installed by copying
+# custom_components/massimo, not as a package.
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
