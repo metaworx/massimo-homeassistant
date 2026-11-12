@@ -134,7 +134,7 @@ def massimo_server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Server]
                 stderr=subprocess.STDOUT,
             )
         )
-        port = int(_wait_line(serve_log, r'msg="api listening" addr=127\.0\.0\.1:(\d+)', "the server").group(1))
+        port = int(_wait_line(serve_log, r'msg="api listening"[^\n]*? addr=127\.0\.0\.1:(\d+)', "the server").group(1))
         url = f"http://127.0.0.1:{port}"
         deadline = time.monotonic() + 20
         while True:
