@@ -9,14 +9,14 @@ from __future__ import annotations
 
 from homeassistant.const import CONF_API_KEY, CONF_URL, CONF_VERIFY_SSL, Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import MassimoClient
+from .const import DOMAIN
 from .coordinator import MassimoConfigEntry, MassimoCoordinator
 
-# The entities come with the next steps of the plan (AP HomeAssistant,
-# Blocks 6 and 7, in Massimo's repository).
-PLATFORMS: list[Platform] = []
+PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SENSOR, Platform.SWITCH]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: MassimoConfigEntry) -> bool:
@@ -34,3 +34,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: MassimoConfigEntry) -> b
 async def async_unload_entry(hass: HomeAssistant, entry: MassimoConfigEntry) -> bool:
     """Stop following the server; the entry's background tasks end with it."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: MassimoConfigEntry, device: dr.DeviceEntry
+) -> bool:
+    """A device may be removed by hand once the server no longer lists it."""
+    serials = entry.runtime_data.data.serials()
+    return not any(domain == DOMAIN and ident in serials for domain, ident in device.identifiers)

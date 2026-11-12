@@ -15,15 +15,21 @@ from custom_components.massimo.api import (
     StreamEvent,
 )
 
-from .conftest import Server, thermostat_room
+from .conftest import Server, http, thermostat_room
 
 
 async def _events(client: MassimoClient, serial: str, last: str | None, want, seconds: float = 15) -> list[StreamEvent]:
-    """Reads a stream until want(events) holds, then leaves it."""
+    """Reads a stream until want(events) holds, then leaves it; the
+    client's own open event, which comes first, is left out."""
     out: list[StreamEvent] = []
 
     async def read() -> None:
+        first = True
         async for ev in client.events(serial, last):
+            if first:
+                assert ev.kind == "open", "the stream's first event is the client's open"
+                first = False
+                continue
             out.append(ev)
             if want(out):
                 return
@@ -101,3 +107,52 @@ async def test_the_stream_resumes(massimo_server: Server, socket_enabled: None) 
         assert all(e.id for e in resumed), "every resumed event carries its id"
         stale = await _events(client, srv.serial, "0-1", lambda evs: len(evs) >= 1)
         assert stale[0].kind == "resync", "an id of another epoch gets resync"
+
+
+class _LoseFirstAnswer:
+    """A session whose first write reaches the server and whose answer is
+    then lost, as on a broken connection."""
+
+    def __init__(self, session: aiohttp.ClientSession) -> None:
+        self.session = session
+        self.keys: list[str] = []
+
+    def request(self, method: str, url: str, **kwargs):
+        self.keys.append(kwargs["headers"]["Idempotency-Key"])
+        outer = self
+
+        class Call:
+            async def __aenter__(self):
+                if len(outer.keys) == 1:
+                    async with outer.session.request(method, url, **kwargs) as resp:
+                        await resp.read()
+                    raise aiohttp.ClientConnectionError("the answer was lost")
+                self.cm = outer.session.request(method, url, **kwargs)
+                return await self.cm.__aenter__()
+
+            async def __aexit__(self, *exc):
+                return await self.cm.__aexit__(*exc)
+
+        return Call()
+
+
+async def test_a_write_lost_on_its_way_back_is_retried_once(massimo_server: Server, socket_enabled: None) -> None:
+    """A write whose answer is lost is sent again with the same
+    Idempotency-Key: the server answers the first one's outcome and runs
+    the command once."""
+    srv = massimo_server
+    rooms = http("GET", f"{srv.url}/api/v1/cubes/{srv.serial}/rooms", srv.owner)
+    rf = next(d["rf_address"] for r in rooms for d in r.get("devices") or [] if "thermostat" in d["type"])  # type: ignore[union-attr]
+
+    def locks() -> int:
+        rows = http("GET", f"{srv.url}/api/v1/audit?user=homeassistant&limit=50", srv.owner)
+        return sum(r["action"] == "device.lock" for r in rows)  # type: ignore[union-attr]
+
+    before = locks()
+    async with aiohttp.ClientSession() as session:
+        lossy = _LoseFirstAnswer(session)
+        client = MassimoClient(lossy, srv.url, srv.key)  # type: ignore[arg-type]
+        answer = await client.set_lock(srv.serial, rf, False)
+    assert answer["ok"] is True
+    assert len(lossy.keys) == 2 and lossy.keys[0] == lossy.keys[1], "the retry carries the same key"
+    assert locks() == before + 1, "the command ran once"

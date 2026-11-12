@@ -1,0 +1,29 @@
+{
+  "entity": {
+    "sensor": {
+      "valve": {
+        "default": "mdi:valve"
+      },
+      "duty_cycle": {
+        "default": "mdi:radio-tower"
+      },
+      "free_memory_slots": {
+        "default": "mdi:memory"
+      },
+      "pending_radiograms": {
+        "default": "mdi:timer-sand"
+      },
+      "queued": {
+        "default": "mdi:tray-full"
+      }
+    },
+    "switch": {
+      "key_lock": {
+        "default": "mdi:lock-open-variant",
+        "state": {
+          "on": "mdi:lock"
+        }
+      }
+    }
+  }
+}

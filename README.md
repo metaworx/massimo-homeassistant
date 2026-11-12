@@ -7,12 +7,12 @@ and Home Assistant becomes one more client of its HTTP API,
 beside Massimo's own web UI and apps.
 
 > **Not ready for use yet.**
-> This is the integration's first step:
-> it sets up a Massimo server and follows its Cubes,
-> but creates no entities yet.
-> Rooms as `climate` entities, the devices' sensors,
-> services and a week-programme card follow.
-> Until then, Home Assistant's own MAX! integration can read the Cube through
+> It sets up a Massimo server, follows its Cubes,
+> and shows their devices with their sensors and key locks;
+> it sets no temperatures yet.
+> Rooms as `climate` entities, services and a week-programme card follow,
+> once Massimo has the room thermostat they are built on.
+> Until then, Home Assistant's own MAX! integration can control the Cube through
 > Massimo's LAN proxy,
 > as Massimo's
 > [docs/homeassistant.md](https://github.com/metaworx/massimo/blob/main/docs/homeassistant.md) describes.
@@ -27,6 +27,25 @@ beside Massimo's own web UI and apps.
   After an interruption it resumes after the last event it read,
   where the server supports it (Massimo with event ids),
   and reads again what the server no longer holds.
+- **Devices**: the Cube as a hub, and each thermostat, window contact and eco
+  switch as a device of its own beneath it,
+  in an area named as its room in Massimo
+  (the area is only suggested, when the device first appears;
+  the areas stay yours).
+  Devices paired later appear without a restart,
+  and devices removed in Massimo leave Home Assistant too.
+- **Entities**:
+  - each thermostat's measured temperature, and a radiator thermostat's valve;
+  - each window contact's window;
+  - every device's battery, and its link and transmit errors (diagnostic);
+  - each thermostat's **key lock** as a switch: on locks its buttons,
+    written through Massimo's queue, and shown once the thermostat reports it;
+  - the Cube's connection, radio duty cycle, free memory slots,
+    pending radiograms and queued commands (diagnostic).
+
+  A device's entities are unavailable while its Cube is not connected,
+  until it has reported, and while Massimo calls it stale
+  (a thermostat silent for 24 hours).
 - **Re-authentication** when the key stops working.
 
 ## Setting up

@@ -48,5 +48,51 @@
       "wrong_server": "Der Schlüssel gehört zu einem anderen Server.",
       "reauth_successful": "Der neue API-Schlüssel funktioniert."
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "connected": {
+        "name": "Verbunden"
+      },
+      "link_error": {
+        "name": "Verbindungsfehler"
+      },
+      "transmit_error": {
+        "name": "Übertragungsfehler"
+      }
+    },
+    "sensor": {
+      "valve": {
+        "name": "Ventil"
+      },
+      "duty_cycle": {
+        "name": "Funkauslastung"
+      },
+      "free_memory_slots": {
+        "name": "Freie Speicherplätze"
+      },
+      "pending_radiograms": {
+        "name": "Ausstehende Funkbefehle"
+      },
+      "queued": {
+        "name": "Wartende Befehle"
+      }
+    },
+    "switch": {
+      "key_lock": {
+        "name": "Tastensperre"
+      }
+    }
+  },
+  "exceptions": {
+    "write_failed": {
+      "message": "Massimo hat den Befehl nicht ausgeführt: {error}"
+    },
+    "discarded": {
+      "message": "Der Cube hat den Befehl verworfen, wie er es tut, wenn sein Funkbudget für die Stunde aufgebraucht ist. Später erneut versuchen."
+    },
+    "device_gone": {
+      "message": "Massimo führt dieses Gerät nicht mehr."
+    }
   }
 }
