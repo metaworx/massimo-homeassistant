@@ -1,0 +1,2 @@
+# The changelog is merged by its own driver (GUIDELINES/shared/tools/changelog.sh).
+/CHANGELOG.md merge=keepachangelog
