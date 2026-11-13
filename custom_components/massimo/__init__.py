@@ -16,6 +16,7 @@ from .api import MassimoClient
 from .const import DOMAIN
 from .coordinator import MassimoConfigEntry, MassimoCoordinator
 from .entity import register_cubes
+from .frontend import async_register_frontend
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -38,6 +39,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MassimoConfigEntry) -> b
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     register_cubes(coordinator)
+    await async_register_frontend(hass)
     coordinator.start_streams()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
