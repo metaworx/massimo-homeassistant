@@ -112,6 +112,9 @@ def massimo_server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Server]
                     "127.0.0.1:0",
                     "-control",
                     "127.0.0.1:0",
+                    # A boost ends after this, not after the devices' minutes.
+                    "-boost-for",
+                    "4s",
                 ],
                 cwd=work,
                 env=env,

@@ -24,6 +24,16 @@
           "on": "mdi:lock"
         }
       }
+    },
+    "select": {
+      "temp_method": {
+        "default": "mdi:thermometer-lines"
+      }
+    }
+  },
+  "services": {
+    "set_vacation": {
+      "service": "mdi:beach"
     }
   }
 }

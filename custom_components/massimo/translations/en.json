@@ -82,6 +82,33 @@
       "key_lock": {
         "name": "Key lock"
       }
+    },
+    "climate": {
+      "room": {
+        "state_attributes": {
+          "consistent": {
+            "name": "Thermostats agree"
+          },
+          "temperature_sources": {
+            "name": "Measured by"
+          },
+          "vacation_until": {
+            "name": "Vacation until"
+          },
+          "pending": {
+            "name": "Radiograms on their way"
+          }
+        }
+      }
+    },
+    "select": {
+      "temp_method": {
+        "name": "Room temperature from",
+        "state": {
+          "median": "Median of the radiator thermostats",
+          "mean": "Mean of the radiator thermostats"
+        }
+      }
     }
   },
   "exceptions": {
@@ -93,6 +120,31 @@
     },
     "device_gone": {
       "message": "Massimo no longer lists this device."
+    },
+    "away_needs_vacation": {
+      "message": "Away is vacation mode, which needs a temperature and an end: use the action Massimo: Set vacation."
+    },
+    "vacation_in_past": {
+      "message": "The vacation's end must lie in the future."
+    },
+    "room_not_read": {
+      "message": "The room's temperatures have not been read yet."
+    }
+  },
+  "services": {
+    "set_vacation": {
+      "name": "Set vacation",
+      "description": "Holds a room at a temperature until an end, then goes back to its week programme.",
+      "fields": {
+        "temperature": {
+          "name": "Temperature",
+          "description": "The temperature to hold, 4.5 to 30.5 °C in steps of 0.5."
+        },
+        "end": {
+          "name": "End",
+          "description": "When the vacation ends, rounded up to the half hour."
+        }
+      }
     }
   }
 }

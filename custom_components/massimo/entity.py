@@ -8,21 +8,27 @@ device id (``via_device_id``): the identifier form, ``via_device``, is
 deprecated, to be removed in Home Assistant 2027.8. A device's area is
 suggested by its room's name; Home Assistant matches or creates the area
 once, and the areas stay the owner's.
+
+A room is a device too, backed by its virtual wall thermostat (Massimo's
+VWT): identified by its Cube and its room_uid, it stays the room's for the
+room's life, whatever thermostats come and go in it.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from typing import Any, override
 
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity, EntityDescription
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .api import MassimoDiscardedError, MassimoError
 from .const import DOMAIN, MANUFACTURER, MODELS
-from .coordinator import CubeData, MassimoConfigEntry, MassimoCoordinator
+from .coordinator import CubeData, MassimoConfigEntry, MassimoCoordinator, room_key
 
 
 def cube_device(coordinator: MassimoCoordinator, serial: str) -> dict[str, Any]:
@@ -52,6 +58,20 @@ class MassimoEntity(CoordinatorEntity[MassimoCoordinator]):
     """An entity of a Massimo server."""
 
     _attr_has_entity_name = True
+
+    @staticmethod
+    async def write(request: Awaitable[Any]) -> Any:
+        """Send a write, a refusal raised as a translated error. The entity
+        shows what the devices report, so the change shows once they have
+        taken it."""
+        try:
+            return await request
+        except MassimoDiscardedError as err:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="discarded") from err
+        except MassimoError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="write_failed", translation_placeholders={"error": str(err)}
+            ) from err
 
 
 class CubeEntity(MassimoEntity):
@@ -139,6 +159,80 @@ class DeviceEntity(MassimoEntity):
         )
 
 
+class RoomEntity(MassimoEntity):
+    """An entity of a room, on its virtual wall thermostat; available while
+    the room's thermostats report through a connected Cube."""
+
+    def __init__(
+        self, coordinator: MassimoCoordinator, cube_serial: str, room_uid: str, description: EntityDescription
+    ) -> None:
+        """Initialise the entity of a room, by its Cube and room_uid, and a
+        description."""
+        super().__init__(coordinator)
+        self.cube_serial = cube_serial
+        self.room_uid = room_uid
+        self.entity_description = description
+        self._attr_unique_id = f"{cube_serial}_{room_uid}_{description.key}"
+        found = coordinator.data.find_room(cube_serial, room_uid)
+        assert found is not None, "an entity is made for a room the data lists"
+        room, vwt = found
+        cube = dr.async_get(coordinator.hass).async_get_device_by_identifier(
+            (DOMAIN, cube_serial), coordinator.config_entry.entry_id
+        )
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, room_key(cube_serial, room))},
+            name=room.get("name") or vwt.get("serial"),
+            manufacturer="Massimo",
+            model="Room",
+            serial_number=vwt.get("serial"),
+            via_device_id=cube.id if cube else None,
+            suggested_area=room.get("name") or None,
+        )
+
+    @property
+    def found(self) -> tuple[dict[str, Any], dict[str, Any]] | None:
+        """The room and its virtual wall thermostat, while the server lists
+        them."""
+        return self.coordinator.data.find_room(self.cube_serial, self.room_uid)
+
+    @property
+    def vwt(self) -> dict[str, Any]:
+        """The room's virtual wall thermostat; empty once the room is gone."""
+        found = self.found
+        return found[1] if found else {}
+
+    @property
+    def state_data(self) -> dict[str, Any]:
+        """The room's state, as Massimo computes it."""
+        return self.vwt.get("state") or {}
+
+    @property
+    def details(self) -> dict[str, Any]:
+        """The room's details: its configuration, settings and tag."""
+        cube = self.coordinator.data.cubes.get(self.cube_serial)
+        return cube.details.get(self.room_uid, {}) if cube else {}
+
+    @property
+    def config(self) -> dict[str, Any]:
+        """The room's configuration: its temperatures and limits."""
+        return self.details.get("wall_thermostat") or self.details.get("thermostat") or {}
+
+    @property
+    @override
+    def available(self) -> bool:
+        """Whether the stream is up, the Cube connected, and the room's
+        thermostats have reported and are not all stale."""
+        cube = self.coordinator.data.cubes.get(self.cube_serial)
+        vwt = self.vwt
+        return (
+            super().available
+            and cube is not None
+            and bool(cube.info.get("connected"))
+            and bool(vwt.get("reported"))
+            and not vwt.get("stale")
+        )
+
+
 def add_entities_as_they_come(
     coordinator: MassimoCoordinator,
     entry: MassimoConfigEntry,
@@ -163,5 +257,10 @@ def add_entities_as_they_come(
 
 
 def devices_of(coordinator: MassimoCoordinator) -> list[tuple[str, dict[str, Any]]]:
-    """Every device the server lists, by its serial."""
+    """Every real device the server lists, by its serial."""
     return [(dev["serial"], dev) for cube in coordinator.data.cubes.values() for _, dev in cube.devices()]
+
+
+def rooms_of(coordinator: MassimoCoordinator) -> list[tuple[str, dict[str, Any]]]:
+    """Every room with a virtual wall thermostat, with its Cube's serial."""
+    return [(serial, room) for serial, cube in coordinator.data.cubes.items() for room, _ in cube.virtual_rooms()]

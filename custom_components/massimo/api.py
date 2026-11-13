@@ -52,10 +52,11 @@ class StreamEvent:
     id: str | None
 
 
-# The devices the integration reads: the real ones only. A newer Massimo
-# adds a virtual wall thermostat per room to its default view (its AP
-# RoomApi); an older one ignores the parameter.
-DEVICES = "real"
+# The devices the integration reads, as Massimo's ?devices= names them:
+# "real" on a Massimo without virtual wall thermostats (the feature vwt), which
+# ignores the parameter, "all" on one with them, each room's then among them.
+DEVICES_REAL = "real"
+DEVICES_ALL = "all"
 
 # A write waits for the Cube's answer, up to two minutes when the radio
 # budget is spent (Massimo's docs/api-v1.md, the setpoint routes).
@@ -81,6 +82,10 @@ class MassimoClient:
         self._key = api_key or None
         self._timeout = aiohttp.ClientTimeout(total=timeout)
         self._write_timeout = aiohttp.ClientTimeout(total=write_timeout)
+        # Set from the server's features once its health is read: which
+        # devices to read, and whether a lost write may be sent again.
+        self.devices = DEVICES_REAL
+        self.retry_writes = True
 
     def _headers(self, accept: str = "application/json") -> dict[str, str]:
         headers = {"Accept": accept}
@@ -106,9 +111,11 @@ class MassimoClient:
     async def _write(self, method: str, path: str, body: dict[str, Any]) -> Any:
         """A write, with an Idempotency-Key, so that the one retry after a
         lost answer gets the first request's outcome and sends nothing to
-        the Cube again."""
+        the Cube again; without the server's idempotency, it is not sent
+        again."""
         headers = self._headers() | {"Idempotency-Key": uuid.uuid4().hex}
-        for attempt in (1, 2):
+        attempts = (1, 2) if self.retry_writes else (2,)
+        for attempt in attempts:
             try:
                 async with self._session.request(
                     method, self.url + path, json=body, headers=headers, timeout=self._write_timeout
@@ -138,8 +145,24 @@ class MassimoClient:
         return [c for c in await self._get("/api/v1/cubes") if c.get("configured")]
 
     async def rooms(self, serial: str) -> list[dict[str, Any]]:
-        """A Cube's rooms, each with its real devices."""
-        return await self._get(f"/api/v1/cubes/{quote(serial)}/rooms?devices={DEVICES}")
+        """A Cube's rooms, each with its devices as ``devices`` says."""
+        return await self._get(f"/api/v1/cubes/{quote(serial)}/rooms?devices={self.devices}")
+
+    async def device(self, serial: str, rf_address: str) -> dict[str, Any]:
+        """One device with its configuration; for a room's virtual wall
+        thermostat, the room's configuration, its settings and its
+        programme's tag."""
+        return await self._get(f"/api/v1/cubes/{quote(serial)}/devices/{quote(rf_address)}")
+
+    async def set_setpoint(self, serial: str, rf_address: str, body: dict[str, Any]) -> dict[str, Any]:
+        """A device's mode and setpoint; for a room's virtual wall
+        thermostat, the room's."""
+        return await self._write("PUT", f"/api/v1/cubes/{quote(serial)}/devices/{quote(rf_address)}/setpoint", body)
+
+    async def set_device_config(self, serial: str, rf_address: str, body: dict[str, Any]) -> dict[str, Any]:
+        """A device's settings; for a room's virtual wall thermostat, the
+        room's, and its own such as temp_method."""
+        return await self._write("PUT", f"/api/v1/cubes/{quote(serial)}/devices/{quote(rf_address)}/config", body)
 
     async def set_lock(self, serial: str, rf_address: str, locked: bool) -> dict[str, Any]:
         """Lock or unlock a thermostat's buttons; its next report shows
@@ -159,7 +182,7 @@ class MassimoClient:
         if last_event_id:
             headers["Last-Event-ID"] = last_event_id
         timeout = aiohttp.ClientTimeout(total=None, sock_connect=10, sock_read=90)
-        url = f"{self.url}/api/v1/cubes/{quote(serial)}/events?devices={DEVICES}"
+        url = f"{self.url}/api/v1/cubes/{quote(serial)}/events?devices={self.devices}"
         try:
             async with self._session.get(url, headers=headers, timeout=timeout) as resp:
                 await self._check(resp)
