@@ -67,21 +67,8 @@ Home Assistant 2026.10 or newer.
 
 The tests run against a real `massimo serve` and Massimo's fake Cube,
 not against mocks.
-Build `massimo` from [metaworx/massimo](https://github.com/metaworx/massimo)
-and point the tests at it and at the fake Cube's recorded greeting:
-
-```bash
-uv python install 3.14
-uv venv --python-preference only-managed --python 3.14 .venv
-VIRTUAL_ENV=.venv uv pip install -r requirements_test.txt
-MASSIMO_BIN=/path/to/massimo \
-MASSIMO_GREETING=/path/to/massimo-repo/tools/ui-test/greeting.txt \
-.venv/bin/python -m pytest
-```
-
-Without `MASSIMO_BIN` and `MASSIMO_GREETING` the tests that need a server are
-skipped; CI sets `MASSIMO_REQUIRED=1`, which fails them instead.
-Lint with `ruff check` and `ruff format --check`.
+[CONTRIBUTING.md](CONTRIBUTING.md) says how to set up, test, commit
+and cut a release.
 
 ## Licence
 
