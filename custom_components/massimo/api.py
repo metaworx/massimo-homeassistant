@@ -34,6 +34,17 @@ class MassimoDiscardedError(MassimoError):
     spent; nothing was sent."""
 
 
+class MassimoChangedError(MassimoError):
+    """A write named the tag of what it read, and that changed since, in
+    another client, at a device, or by a write still on its way; nothing
+    was sent. ``etag`` is the current tag."""
+
+    def __init__(self, message: str, etag: str | None) -> None:
+        """Keep the current tag beside the message."""
+        super().__init__(message)
+        self.etag = etag
+
+
 @dataclass(frozen=True, slots=True)
 class StreamEvent:
     """An event of a Cube's event stream.
@@ -97,6 +108,13 @@ class MassimoClient:
     async def _check(resp: aiohttp.ClientResponse) -> None:
         if resp.status in (401, 403):
             raise MassimoAuthError(f"{resp.status}: {(await resp.text()).strip()}")
+        if resp.status == 412:
+            text = (await resp.text()).strip()
+            try:
+                etag = json.loads(text).get("etag")
+            except ValueError, AttributeError:
+                etag = None
+            raise MassimoChangedError(f"412: {text}", etag or resp.headers.get("ETag", "").strip('"') or None)
         if resp.status >= 400:
             raise MassimoError(f"{resp.status}: {(await resp.text()).strip()}")
 
@@ -108,12 +126,12 @@ class MassimoClient:
         except (aiohttp.ClientError, TimeoutError) as err:
             raise MassimoConnectionError(f"{path}: {err}") from err
 
-    async def _write(self, method: str, path: str, body: dict[str, Any]) -> Any:
+    async def _write(self, method: str, path: str, body: dict[str, Any], headers: dict[str, str] | None = None) -> Any:
         """A write, with an Idempotency-Key, so that the one retry after a
         lost answer gets the first request's outcome and sends nothing to
         the Cube again; without the server's idempotency, it is not sent
         again."""
-        headers = self._headers() | {"Idempotency-Key": uuid.uuid4().hex}
+        headers = self._headers() | {"Idempotency-Key": uuid.uuid4().hex} | (headers or {})
         attempts = (1, 2) if self.retry_writes else (2,)
         for attempt in attempts:
             try:
@@ -158,6 +176,22 @@ class MassimoClient:
         """A device's mode and setpoint; for a room's virtual wall
         thermostat, the room's."""
         return await self._write("PUT", f"/api/v1/cubes/{quote(serial)}/devices/{quote(rf_address)}/setpoint", body)
+
+    async def program(self, serial: str, rf_address: str) -> dict[str, Any]:
+        """A device's week programme, keyed by weekday, with its tag
+        (``etag``), ``pending`` and ``program_consistent``; for a room's
+        virtual wall thermostat, the room's."""
+        return await self._get(f"/api/v1/cubes/{quote(serial)}/devices/{quote(rf_address)}/program")
+
+    async def set_program(
+        self, serial: str, rf_address: str, days: dict[str, Any], etag: str | None = None
+    ) -> dict[str, Any]:
+        """Write days of a week programme; with the tag read, refused with
+        MassimoChangedError where the programme changed since. The answer
+        carries the new tag."""
+        headers = {"If-Match": f'"{etag}"'} if etag else None
+        path = f"/api/v1/cubes/{quote(serial)}/devices/{quote(rf_address)}/program"
+        return await self._write("PUT", path, days, headers)
 
     async def set_device_config(self, serial: str, rf_address: str, body: dict[str, Any]) -> dict[str, Any]:
         """A device's settings; for a room's virtual wall thermostat, the

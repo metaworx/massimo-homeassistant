@@ -34,6 +34,15 @@
   "services": {
     "set_vacation": {
       "service": "mdi:beach"
+    },
+    "get_program": {
+      "service": "mdi:calendar-clock"
+    },
+    "set_program": {
+      "service": "mdi:calendar-edit"
+    },
+    "copy_program": {
+      "service": "mdi:content-copy"
     }
   }
 }
