@@ -90,6 +90,17 @@ CI runs all three, and HACS's validation.
 - **Massimo is the other side.**
   What the integration needs from Massimo's API is made in Massimo first,
   and tested there; the integration then uses it.
+- **The brand images** in `custom_components/massimo/brand/` are Massimo's
+  mark, made by Massimo's `tools/brand/make_brand.py`, never edited here.
+  To make them again, in Massimo's checkout (`tools/brand/README.md` there
+  has the set-up):
+
+  ```bash
+  tools/brand/.venv/bin/python tools/brand/make_brand.py --flavour grayorange --scope homeassistant --yes
+  ```
+
+  and copy the eight files of `GUIDELINES/temp/brand/grayorange/homeassistant-brand/`
+  into `custom_components/massimo/brand/`.
 
 ## Committing
 
