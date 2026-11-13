@@ -12,6 +12,9 @@ setpoint (manual), ``off`` holds 4.5 °C, which a thermostat shows as off.
 The presets ``eco`` and ``comfort`` hold the room's eco and comfort
 temperatures, ``away`` is vacation mode, set with ``massimo.set_vacation``
 for its temperature and end, and ``none`` goes back to the week programme.
+``boost``, where the server lists the feature boost, opens the valves for
+the thermostats' boost time, after which they go back to the mode they had
+by themselves; it shows while any thermostat of the room boosts.
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ import probatio
 from homeassistant.components.climate import (
     ATTR_HVAC_MODE,
     PRESET_AWAY,
+    PRESET_BOOST,
     PRESET_COMFORT,
     PRESET_ECO,
     PRESET_NONE,
@@ -109,7 +113,7 @@ class RoomClimate(RoomEntity, ClimateEntity):
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_target_temperature_step = STEP
     _attr_hvac_modes = [HVACMode.AUTO, HVACMode.HEAT, HVACMode.OFF]
-    _attr_preset_modes = [PRESET_NONE, PRESET_ECO, PRESET_COMFORT, PRESET_AWAY]
+    _presets = [PRESET_NONE, PRESET_ECO, PRESET_COMFORT, PRESET_AWAY]
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.PRESET_MODE
@@ -175,13 +179,26 @@ class RoomClimate(RoomEntity, ClimateEntity):
         return HVACAction.HEATING if valve > 0 else HVACAction.IDLE
 
     @property
+    def _boost(self) -> bool:
+        return self.coordinator.data.feature("boost")
+
+    @property
+    @override
+    def preset_modes(self) -> list[str]:
+        """none, eco, comfort, away, and boost where the server has it."""
+        return [*self._presets, PRESET_BOOST] if self._boost else list(self._presets)
+
+    @property
     @override
     def preset_mode(self) -> str | None:
-        """away in vacation mode; eco or comfort where a manual setpoint is
-        the room's eco or comfort temperature; else none."""
+        """away in vacation mode; boost while a thermostat boosts; eco or
+        comfort where a manual setpoint is the room's eco or comfort
+        temperature; else none."""
         mode, setpoint = self._mode, self._setpoint
         if mode == "vacation":
             return PRESET_AWAY
+        if mode == "boost" and self._boost:
+            return PRESET_BOOST
         if mode == "manual" and setpoint is not None:
             if setpoint == self.config.get("eco_temp"):
                 return PRESET_ECO
@@ -246,12 +263,16 @@ class RoomClimate(RoomEntity, ClimateEntity):
 
     @override
     async def async_set_preset_mode(self, preset_mode: str) -> None:
-        """eco and comfort hold the room's temperatures; none goes back to
-        the week programme; away is set with massimo.set_vacation."""
+        """eco and comfort hold the room's temperatures; boost opens the
+        valves for the boost time; none goes back to the week programme;
+        away is set with massimo.set_vacation."""
         if preset_mode == PRESET_AWAY:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="away_needs_vacation")
         if preset_mode == PRESET_NONE:
             await self._set({"mode": "auto"})
+            return
+        if preset_mode == PRESET_BOOST:
+            await self._set({"mode": "boost"})
             return
         key = "eco_temp" if preset_mode == PRESET_ECO else "comfort_temp"
         temp = self.config.get(key)

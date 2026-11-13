@@ -9,8 +9,8 @@ beside Massimo's own web UI and apps.
 > **Not released yet.**
 > It sets up a Massimo server, follows its Cubes,
 > shows their devices with their sensors and key locks,
-> and controls each room's heating.
-> Boost, week programmes and a week-programme card follow.
+> and controls each room's heating, boost included.
+> Week programmes and a week-programme card follow.
 > Until a release, Home Assistant's own MAX! integration can control the Cube through
 > Massimo's LAN proxy,
 > as Massimo's
@@ -56,7 +56,9 @@ beside Massimo's own web UI and apps.
     `off` holds 4.5 °C, which the thermostats show as off.
     Presets: `eco` and `comfort` hold the room's eco and comfort
     temperatures, `away` shows vacation mode, `none` goes back to the week
-    programme.
+    programme, and `boost` (from a Massimo with the feature `boost`) opens the
+    valves for the thermostats' boost time, after which they go back to the
+    mode they had.
     Every write goes through Massimo's queue to all thermostats of the room,
     and shows once they report it.
   - **Massimo: Set vacation** (`massimo.set_vacation`) holds a room at a

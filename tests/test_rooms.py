@@ -244,3 +244,38 @@ async def test_a_massimo_without_virtual_wall_thermostats(
     assert hass.states.async_entity_ids("sensor"), "the devices are there"
     assert "its rooms need a newer Massimo" in caplog.text
     await _unload(hass, entry)
+
+
+async def test_boost(hass: HomeAssistant, massimo_server: Server, socket_enabled: None) -> None:
+    """The preset boost opens the room's valves; after the boost time the
+    thermostats go back to the mode they had by themselves."""
+    entry = await _setup(hass, massimo_server)
+    room = _climate(hass, massimo_server, SCHLAFEN)
+    assert "boost" in _attr(hass, room, "preset_modes")
+    await _until(hass, lambda: hass.states.get(room).state == HVACMode.AUTO, "the room follows its programme")
+    await _call(hass, "set_preset_mode", room, preset_mode="boost")
+    await _until(hass, lambda: _attr(hass, room, "preset_mode") == "boost", "the room boosts")
+    assert hass.states.get(room).state == HVACMode.HEAT
+    assert _attr(hass, room, "hvac_action") == HVACAction.HEATING
+    await _until(hass, lambda: hass.states.get(room).state == HVACMode.AUTO, "back to the programme", seconds=20)
+    assert _attr(hass, room, "preset_mode") == "none"
+    await _unload(hass, entry)
+
+
+async def test_no_boost_without_the_feature(hass: HomeAssistant, massimo_server: Server, socket_enabled: None) -> None:
+    """A server that does not list boost gets no preset boost, and choosing
+    it is refused."""
+    health = MassimoClient.health
+
+    async def without_boost(self: MassimoClient) -> dict:
+        answer = await health(self)
+        answer["features"] = {k: v for k, v in answer["features"].items() if k != "boost"}
+        return answer
+
+    with patch.object(MassimoClient, "health", without_boost):
+        entry = await _setup(hass, massimo_server)
+    room = _climate(hass, massimo_server, SCHLAFEN)
+    assert "boost" not in _attr(hass, room, "preset_modes")
+    with pytest.raises(ServiceValidationError):
+        await _call(hass, "set_preset_mode", room, preset_mode="boost")
+    await _unload(hass, entry)
