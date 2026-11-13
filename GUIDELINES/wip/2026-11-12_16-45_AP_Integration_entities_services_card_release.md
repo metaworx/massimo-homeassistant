@@ -1,4 +1,4 @@
-# AP Integration v1.4: Entities, services, card, release
+# AP Integration v1.5: Entities, services, card, release
 
 ## TL;DR
 
@@ -7,11 +7,12 @@ Massimo's room thermostat, is released through the Marketplace,
 and replaces `maxcube` on breno.
 Each block requires the Massimo feature it uses, by name, from `/healthz`.
 
-- devices, release mechanics, rooms, boost, programmes → done (Blocks 1-5)
-- brand images → none → the mark (`grayorange`, the "i" dotted orange) in
-  `custom_components/massimo/brand/`, from Massimo's `tools/brand/`,
-  trimmed to the mark (D27-A), now (D28-A)
-- card → none → Massimo's element from the connected server
+- devices, release mechanics, rooms, boost, programmes, brand images
+  → done (Blocks 1-6)
+- card → none → a Lovelace card hosting Massimo's `<massimo-week-program>`,
+  fetched with Home Assistant's sign-in from the connected server;
+  native controls in Home Assistant's theme; sends the changed days with
+  the tag, offers a reload on a change made meanwhile
 - release → none → `changelog.sh cut`, a signed tag, a GitHub release, the
   Marketplace; HACS kept for 2026.10
 
@@ -22,8 +23,8 @@ Each block requires the Massimo feature it uses, by name, from `/healthz`.
 3. Rooms: room devices, `climate`, `set_vacation`, `temp_method` - done
 4. Boost: the preset `boost` - done
 5. Programmes: get, set, copy with the ETag, `program_changed` - done
-6. Brand images: Massimo's tool trims them; the eight in `brand/`
-7. Card: Massimo's element served from the connected server
+6. Brand images - done
+7. Card: the view for Massimo's element and texts, the card, its editor
 8. First release: the Marketplace, the tag
 9. Breno, on the owner's word there
 
@@ -99,10 +100,17 @@ Apache-2.0; the repository is public.
 - **D16-A.**
   Boost is a block of its own after the rooms
   (decided while Massimo's boost waited; kept for two smaller changes).
-- **D20-A.**
-  This session writes the plan's revisions.
-  v1.4 was written by the session that designed the mark, on the owner's
-  `PLAN++` there.
+- **D21-A.**
+  The presets stay Home Assistant's standard ones: `none`, `eco`,
+  `comfort`, `away`, `boost`; `none` goes back to the week programme.
+- **D22-A.**
+  The card fetches Massimo's element and texts through a view that needs
+  Home Assistant's sign-in, and runs the element from a blob:
+  Home Assistant passes Massimo's files to nobody who is not signed in.
+- **D24-A.**
+  The card is checked by hand in a scratch Home Assistant with its frontend,
+  against the fake Cube, in a browser at 1100 and 390 px,
+  its screenshots shown at the commit gate.
 - **D27-A.**
   Home Assistant's brand images are trimmed to the mark, as its brand rules
   ask: Massimo's tool does it in its `homeassistant` scope.
@@ -111,6 +119,13 @@ Apache-2.0; the repository is public.
   not with the first release.
 - **D29-A.**
   That block is done in a worktree of its own, on a branch from `origin/main`.
+- **D30-A.**
+  Two sessions wrote a v1.4 each; `main`'s stands, and v1.5 adds the card's
+  steps and D21, D22 and D24 from the other, which was never committed to
+  `main`.
+- **D31-A** (replaces D20-A).
+  One writer per revision: the session whose block comes next,
+  after fetching `main` and building on the plan there.
 - **Areas.**
   Every device suggests its room's name as its area, once;
   the areas stay the owner's.
@@ -171,6 +186,30 @@ Massimo's tool writes them from its drawing; its images of #215 keep a
 margin (13 px left and right, 22 px top and bottom of the icon at 256 px).
 Its v1.1.0, on the branch `claude/web-brand` of Massimo's AP WebBrand, adds
 the web UI's files and leaves the others' bytes as they were.
+
+**The card's element** (Massimo's `internal/server/ui/week-program.js`,
+AGPL-3.0-or-later): a classic script defining `<massimo-week-program>`,
+without a shadow root; its host gives it `model`
+(`MassimoWeekProgram.model(programme)`), `kit` and `storedOn`, and asks
+`dirtyDays()` and `resetControls()`; it dispatches `change`.
+Its kit is `t` (Massimo's texts `prog.*`, `day.*`, `dayShort.*`, flat keys
+with `{placeholders}`, in `/ui/i18n/<lang>.json`: en, de, fr, it, nl, pl),
+`elem`, `textEl`, `button`, `switchEl`, `fieldRow`, `numberInput`, `fmtNum`,
+`fmtTemp`, `clamp` and `temps`.
+It finds its day buttons as `.prog-days button` and sets their `className`
+(`day`, `selected`, `editing`, `dirty`, `chosen`) and `disabled`:
+the kit's buttons are native `<button>`s, styled by the card;
+the switch is Home Assistant's `ha-switch`.
+Its look is the class names Massimo's AGPL `style.css` styles
+(`day-bar`, `prog-bar`, `prog-seg` with `--warm`, `prog-point`, `step`,
+`muted`, `small`): the card has CSS of its own for them, in Home Assistant's
+theme variables.
+Massimo's page sends the changed days with the tag, and on `412` keeps the
+edits and offers a reload (`config.js`, `sendProgram`).
+Home Assistant 2026.10 loads a script on every page with
+`frontend.add_extra_js_url`, serves files with
+`http.async_register_static_paths`, and signs a card's fetch with
+`hass.fetchWithAuth`.
 
 **Tests** run on Massimo's fixture `rooms`:
 room 1 "Wohnen", a wall thermostat at 21.4 °C and two radiator thermostats;
@@ -267,7 +306,9 @@ Requires `program_etag` 1.x.
 **Verification:**
 as Block 3.
 
-### Block 6: Brand images
+### Block 6: Brand images - done
+
+Merged as #7.
 
 1. **Massimo** (its own plan, on `claude/web-brand`, a pull request stacked
    on it): the tool's `homeassistant` scope writes the images trimmed to the
@@ -287,17 +328,38 @@ the test gate and lint of the contract; hassfest.
 
 ### Block 7: Card
 
-1. A view that passes on Massimo's `week-program.js` and its translations
-   from the entry's server, kept per Massimo version (D4).
-2. `massimo-week-program-card.js`: picks a room, reads its programme,
-   gives the element a kit of Home Assistant's controls,
-   sends the changed days with the ETag, offers a reload on `412`;
-   a card editor.
-3. The integration serves the card and adds it to the frontend.
-4. Tests that both are served; a check by hand.
+1. **The view** `/api/massimo/ui/{name}`, signed in (D22-A):
+   `week-program.js` and `i18n/<lang>.json` from the Massimo server of the
+   entry an `entity_id` names, else the first, kept per Massimo version;
+   any other name, and a file the server has not, `404`.
+2. **The card** `massimo-week-program-card`, plain JavaScript without a
+   build, in `custom_components/massimo/frontend/`:
+   a room's `climate` in its configuration;
+   Massimo's element and texts loaded once per page, by Home Assistant's
+   language, else English;
+   the kit of native elements and `ha-switch`, styled by the card's CSS in
+   Home Assistant's theme variables;
+   the programme read with `massimo.get_program`;
+   **Send** writes the changed days, checked as Massimo's page checks them,
+   with `massimo.set_program` and the tag;
+   a programme changed meanwhile keeps the edits and offers **Reload**;
+   read again by itself when `program_tag` changes and nothing is edited.
+3. **Its editor** by `getConfigForm`: the room's `climate`, of this
+   integration; the card listed in the card picker (`window.customCards`).
+4. **The integration serves** the card's script on a static path and loads
+   it on every page (`add_extra_js_url`) where the frontend runs;
+   `manifest.json` names `http` as a dependency and `frontend` after it.
+5. **Tests:** the view's files, signed in and refused without; a name it
+   does not serve; the card's script served; the script registered with a
+   frontend.
+6. **The check by hand** (D24-A): a scratch Home Assistant 2026.10.4 with
+   `home-assistant-frontend` 20260930.5, against the fake Cube, the card on a
+   dashboard, at 1100 and 390 px: reading, editing, sending, a change made
+   meanwhile, the editor.
+7. **CHANGELOG fragment**, `README.md`.
 
 **Verification:**
-as Block 3, and the card on a Home Assistant at 1100 and 390 px.
+as Block 3, and the check by hand.
 
 ### Block 8: First release
 
@@ -324,19 +386,19 @@ a setpoint from Home Assistant seen in Massimo's log.
 
 ## Proposed commit message
 
-For the revision, committed on its own before Block 6:
+For the revision, committed on its own before Block 7's commit:
 
 ```
-chore(aps): +Integration v1.4
+chore(aps): +Integration v1.5
 
-The mark as the owner chose it, its generator in Massimo, and its brand images now, trimmed to the mark, as a block of their own before the card.
+The card in steps on main's v1.4, from the session's own v1.4 that main never had: the view, the card and its editor, and the decisions taken at its gates.
 
 Key changes:
-- D13-Z4 brought up to date: the flavour grayorange with the orange-dotted i, the generator Massimo's tools/brand/
-- D27-A, D28-A, D29-A: trimmed by Massimo's tool; now, Block 6; in a worktree of its own
-- Blocks 3 to 5 done (#5, #6); the brand images Block 6, the card 7, the first release 8, breno 9
+- Block 6, the brand images, done (#7)
+- Block 7, the card, in steps from Massimo's element and Home Assistant's frontend
+- D21-A, D22-A, D24-A recorded; D30-A, how the two v1.4 meet; D31-A replaces D20-A
 
-File-revision-v1: GUIDELINES/wip/2026-11-12_16-45_AP_Integration_entities_services_card_release.md::v1.4::2026-11-13::TL;DR, Discussion, Analysis, Implementation Plan, Proposed commit message, Change History::the brand images Block 6, D13 up to date, D27-A to D29-A
+File-revision-v1: GUIDELINES/wip/2026-11-12_16-45_AP_Integration_entities_services_card_release.md::v1.5::2026-11-13::TL;DR, Discussion, Analysis, Implementation Plan, Proposed commit message, Change History::Block 6 done, Block 7 in steps; D21, D22, D24, D30, D31
 Assisted-by: claude-code:claude-opus-5-5
 ```
 
@@ -373,3 +435,11 @@ Assisted-by: claude-code:claude-opus-5-5
   orange, the generator Massimo's `tools/brand/`); D27-A, D28-A, D29-A.
   Blocks 3 to 5 done (#5, #6); the brand images a block of their own, 6,
   trimmed by Massimo's tool; the card 7, the first release 8, breno 9.
+- v1.5 (2026-11-13): Block 6 done (#7).
+  Block 7 in steps: the view, the card with a kit of native controls,
+  which the element's `.prog-days button` requires, and CSS of its own,
+  its editor, its registration, its tests and the check by hand;
+  from a v1.4 of the card's session that `main` never had (D30-A).
+  D21-A (the standard presets), D22-A (the element fetched with the
+  sign-in), D24-A (the check by hand in a scratch Home Assistant);
+  D31-A (one writer per revision, building on `main`) replaces D20-A.
