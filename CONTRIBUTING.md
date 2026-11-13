@@ -21,21 +21,20 @@ Under WSL, keep `--python-preference only-managed`:
 a plain `uv venv --python 3.14` can take the Windows Python and make a Windows
 venv.
 
-The tests need a `massimo` binary and the fake Cube's recorded greeting,
-both from a checkout of [metaworx/massimo](https://github.com/metaworx/massimo):
+The tests need a `massimo` binary,
+built from `main` of [metaworx/massimo](https://github.com/metaworx/massimo):
 
 ```bash
 git clone https://github.com/metaworx/massimo ../massimo
 (cd ../massimo && CGO_ENABLED=0 go build -o "$PWD/massimo" ./cmd/massimo)
 ```
 
-Where they are on your machine goes in `GUIDELINES/config.local.ini`,
+Where the checkout is on your machine goes in `GUIDELINES/config.local.ini`,
 which is not tracked:
 
 ```ini
 [massimo]
 	checkout = /path/to/massimo
-	greeting = /path/to/massimo/tools/ui-test/greeting.txt
 ```
 
 ## Testing
@@ -47,12 +46,14 @@ Nothing is ever sent to a real Cube from here.
 ```bash
 MASSIMO_REQUIRED=1 \
 MASSIMO_BIN=../massimo/massimo \
-MASSIMO_GREETING=../massimo/tools/ui-test/greeting.txt \
 .venv/bin/python -m pytest
 ```
 
+The fake Cube serves Massimo's fixture `rooms`
+and carries out what it acknowledges;
+its control port sets a device's state as the device's report would.
 Without `MASSIMO_REQUIRED=1`,
-the tests that need a server are skipped where the two variables are missing;
+the tests that need a server are skipped where `MASSIMO_BIN` is missing;
 with it, as in CI, they fail.
 CI builds `massimo` from Massimo's `main`,
 or from the branch, tag or commit a manual run names,

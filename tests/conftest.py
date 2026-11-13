@@ -2,10 +2,21 @@
 
 The tests run against ``massimo serve`` and ``massimo fakecube``, as
 Massimo's own UI suite does, rather than against mocks. MASSIMO_BIN names
-the massimo binary (default: massimo on the PATH), MASSIMO_GREETING the fake
-Cube's recorded greeting (Massimo's tools/ui-test/greeting.txt); without
-them the tests that need a server are skipped, or fail where
-MASSIMO_REQUIRED is set, as CI sets it.
+the massimo binary (default: massimo on the PATH); without one the tests
+that need a server are skipped, or fail where MASSIMO_REQUIRED is set, as CI
+sets it.
+
+The fake Cube serves Massimo's fixture ``rooms`` (its
+internal/cubelan/fakecube/fixture.go): room 1 "Wohnen" with a wall
+thermostat and two radiator thermostats, room 2 "Schlafen" with three
+radiator thermostats, room 3 "Flur" with a window contact alone. It carries
+out what it acknowledges, as the devices would, and its control port sets a
+device's state as a device's report would; the server reads its device list
+every second.
+
+The tests read the server as the integration does, with ``?devices=real``:
+Massimo's default view adds a virtual wall thermostat to each room without a
+real one.
 """
 
 from __future__ import annotations
@@ -46,6 +57,7 @@ class Server:
     serial: str
     node_id: str
     port: int
+    control: str
 
 
 def _wait_line(log: Path, pattern: str, what: str, seconds: float = 15) -> re.Match[str]:
@@ -75,11 +87,10 @@ def http(method: str, url: str, token: str | None, body: object | None = None) -
 def massimo_server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Server]:
     """The fake Cube and a server connected to it, for the whole session."""
     binary = os.environ.get("MASSIMO_BIN") or shutil.which("massimo")
-    greeting = os.environ.get("MASSIMO_GREETING")
-    if not binary or not greeting:
+    if not binary:
         if os.environ.get("MASSIMO_REQUIRED"):
-            pytest.fail("MASSIMO_REQUIRED is set, and MASSIMO_BIN or MASSIMO_GREETING is missing")
-        pytest.skip("MASSIMO_BIN and MASSIMO_GREETING are needed for a server")
+            pytest.fail("MASSIMO_REQUIRED is set, and MASSIMO_BIN is missing")
+        pytest.skip("MASSIMO_BIN is needed for a server")
     # Home Assistant's harness blocks sockets for each test; the fixture's
     # own requests go to the loopback only.
     pytest_socket.enable_socket()
@@ -90,7 +101,18 @@ def massimo_server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Server]
         fake_log = work / "fakecube.log"
         procs.append(
             subprocess.Popen(
-                [binary, "fakecube", "-greeting", greeting, "-listen", "127.0.0.1:0", "-discovery", "127.0.0.1:0"],
+                [
+                    binary,
+                    "fakecube",
+                    "-fixture",
+                    "rooms",
+                    "-listen",
+                    "127.0.0.1:0",
+                    "-discovery",
+                    "127.0.0.1:0",
+                    "-control",
+                    "127.0.0.1:0",
+                ],
                 cwd=work,
                 env=env,
                 stdout=fake_log.open("wb"),
@@ -99,12 +121,14 @@ def massimo_server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Server]
         )
         cube = _wait_line(fake_log, r"fake cube listening on (127\.0\.0\.1:\d+)", "the fake Cube").group(1)
         disc = _wait_line(fake_log, r"answering discovery on (127\.0\.0\.1:\d+)", "the fake Cube's discovery").group(1)
+        control = _wait_line(fake_log, r"control listening on (127\.0\.0\.1:\d+)", "the fake Cube's control").group(1)
         owner = secrets.token_hex(16)
         serve_log = work / "serve.log"
         procs.append(
             subprocess.Popen(
-                # A setpoint shows in the Cube's next device list, which the
-                # server polls: every second here, a minute by default.
+                # A write the fake Cube carried out shows in its next device
+                # list, which the server polls: every second here, a minute
+                # by default.
                 [
                     binary,
                     "serve",
@@ -148,7 +172,7 @@ def massimo_server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Server]
         made = http("POST", url + "/api/v1/users/homeassistant/tokens", owner, {"label": "tests"})
         key = made.get("token") or made.get("secret")  # type: ignore[union-attr]
         node = http("GET", url + "/healthz", None).get("node_id", "")  # type: ignore[union-attr]
-        yield Server(url=url, owner=owner, key=key, serial=SERIAL, node_id=node, port=port)
+        yield Server(url=url, owner=owner, key=key, serial=SERIAL, node_id=node, port=port, control=f"http://{control}")
     finally:
         for p in procs:
             p.terminate()
@@ -159,9 +183,20 @@ def massimo_server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Server]
                 p.kill()
 
 
+def rooms(server: Server) -> list[dict]:
+    """The rooms with their real devices, as the integration reads them."""
+    return http("GET", f"{server.url}/api/v1/cubes/{server.serial}/rooms?devices=real", server.owner)  # type: ignore[return-value]
+
+
+def set_state(server: Server, rf_address: str, **fields: object) -> None:
+    """Sets a device's state on the fake Cube, as the device's report
+    would; the server sees it at its next read of the device list."""
+    http("PUT", f"{server.control}/devices/{rf_address}/state", None, fields)
+
+
 def thermostat_room(server: Server) -> dict:
     """The first room with a thermostat, as the API describes it."""
-    for room in http("GET", f"{server.url}/api/v1/cubes/{server.serial}/rooms", server.owner):  # type: ignore[union-attr]
+    for room in rooms(server):
         if any("thermostat" in (d.get("type") or "") for d in room.get("devices") or []):
             return room
     raise AssertionError("the fake Cube has no room with a thermostat")

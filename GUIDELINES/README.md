@@ -20,10 +20,9 @@ cd massimo-homeassistant
 uv python install 3.14
 uv venv --python-preference only-managed --python 3.14 .venv
 VIRTUAL_ENV=.venv uv pip install -r requirements_test.txt
-# a massimo binary and the fake Cube's greeting, from Massimo's checkout:
+# a massimo binary, built from Massimo's main:
 (cd ../massimo && go build -o /tmp/massimo ./cmd/massimo)
-MASSIMO_REQUIRED=1 MASSIMO_BIN=/tmp/massimo \
-MASSIMO_GREETING=../massimo/tools/ui-test/greeting.txt .venv/bin/python -m pytest
+MASSIMO_REQUIRED=1 MASSIMO_BIN=/tmp/massimo .venv/bin/python -m pytest
 ```
 
 To try it in a Home Assistant, copy `custom_components/massimo` into its
@@ -50,7 +49,7 @@ Editing a generated file is wasted work — change the fragment and re-run
 ---
 
 
-# Massimo for Home Assistant — Project Contract (v1.0.0)
+# Massimo for Home Assistant — Project Contract (v1.1.0)
 
 What binds work in this project, for everyone working on it.
 Inlined into `/AGENTS.md` for agents and into `GUIDELINES/README.md` for people,
@@ -75,8 +74,8 @@ so that the two cannot drift apart.
 | Language(s)           | declared as `project.languages` in `GUIDELINES/config.ini`, kept honest by `GUIDELINES/shared/tools/detect-languages.sh --check` |
 | Source directories    | `custom_components/massimo/` (the integration: `api.py` the client of Massimo's API, `config_flow.py`, `coordinator.py`, the platforms to come, `translations/`), `tests/` (pytest against a real Massimo server), `.github/workflows/` (CI) |
 | Shipped-code paths    | declared as `project.shipped` in `GUIDELINES/config.ini` and listed below; kept honest by `GUIDELINES/shared/tools/changelog.sh check` (rule: `GUIDELINES/shared/COMMIT.md` §5) |
-| Version manifest      | `custom_components/massimo/manifest.json`, its `version`; HACS and the Marketplace read the repository's release tags; how a release is cut is still to be decided (the plan's release block) |
-| Test gate command     | `MASSIMO_REQUIRED=1 MASSIMO_BIN=<massimo> MASSIMO_GREETING=<greeting.txt> .venv/bin/python -m pytest` against a `massimo` built from Massimo's checkout and its `tools/ui-test/greeting.txt` (where they are on this machine: `GUIDELINES/config.local.ini`, section `[massimo]`); then hassfest: `docker run --rm -v "$PWD":/github/workspace ghcr.io/home-assistant/hassfest`; CI runs both, and HACS's validation |
+| Version manifest      | `custom_components/massimo/manifest.json`, its `version`, which `changelog.sh cut` writes; a release is a signed tag `v<version>` and a GitHub release made from it, which HACS offers (`CONTRIBUTING.md`, "Cutting a release") |
+| Test gate command     | `MASSIMO_REQUIRED=1 MASSIMO_BIN=<massimo> .venv/bin/python -m pytest` against a `massimo` built from Massimo's `main` (where its checkout is on this machine: `GUIDELINES/config.local.ini`, section `[massimo]`); then hassfest: `docker run --rm -v "$PWD":/github/workspace ghcr.io/home-assistant/hassfest`; CI runs both, and HACS's validation |
 | Lint command          | `ruff check custom_components tests` and `ruff format --check custom_components tests` print nothing to fix, with the settings of `pyproject.toml` (ruff 0.17.4, as CI pins it) |
 | Commit summary        | declared as `[commit]` in `GUIDELINES/config.ini` and shown below; held to it by `GUIDELINES/shared/tools/commit-msg.sh` (rule: `GUIDELINES/shared/COMMIT.md` §3.1) |
 
@@ -162,9 +161,10 @@ Every commit summary opens as `config.ini`'s `[commit]` keys ask (COMMIT.md §3.
   Massimo's own documents on Home Assistant are its `docs/homeassistant.md`.
 - **Tests run against a real `massimo serve` with the fake Cube**,
   never against mocks of the API: `tests/conftest.py` starts both on free ports.
-  The fake Cube acknowledges a setpoint but changes no state,
-  so no state event follows one;
-  a room rename (a metadata write) makes the server announce events.
+  The fake Cube serves Massimo's fixture `rooms` and carries out what it
+  acknowledges, as the devices would;
+  its control port sets a device's state as a device's report would.
+  The tests read the server as the integration does, with `?devices=real`.
   Nothing is ever sent to a real Cube from here.
 - **Home Assistant 2026.10 and newer.**
   Schemas are written with `probatio`, not `voluptuous`; overrides carry

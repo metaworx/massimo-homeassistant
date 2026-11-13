@@ -74,5 +74,4 @@ jobs:
       - name: pytest
         env:
           MASSIMO_REQUIRED: "1"
-          MASSIMO_GREETING: ${{ github.workspace }}/massimo/tools/ui-test/greeting.txt
         run: MASSIMO_BIN="$RUNNER_TEMP/massimo" python -m pytest -v -rs

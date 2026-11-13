@@ -28,8 +28,8 @@ def _entry(hass: HomeAssistant, server: Server, key: str) -> MockConfigEntry:
 
 
 async def test_setup_follows_the_stream(hass: HomeAssistant, massimo_server: Server, socket_enabled: None) -> None:
-    """The entry loads with the Cube and its rooms; a setpoint changed on
-    the server arrives through the stream; unloading ends the stream."""
+    """The entry loads with the Cube and its rooms; a room renamed on the
+    server arrives through the stream; unloading ends the stream."""
     entry = _entry(hass, massimo_server, massimo_server.key)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -38,8 +38,8 @@ async def test_setup_follows_the_stream(hass: HomeAssistant, massimo_server: Ser
     cube = coordinator.data.cubes[massimo_server.serial]
     assert cube.info["name"] == "Fake Cube" and cube.rooms
 
-    # The fake Cube changes no state on a setpoint; a rename is a metadata
-    # write, after which the coordinator reads the rooms again.
+    # A rename is a metadata write, after which the coordinator reads the
+    # rooms again.
     room = thermostat_room(massimo_server)
     name = f"Room {secrets.token_hex(3)}"
     await hass.async_add_executor_job(
