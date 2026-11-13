@@ -1,4 +1,4 @@
-# AP Integration v1.3: Entities, services, card, release
+# AP Integration v1.4: Entities, services, card, release
 
 ## TL;DR
 
@@ -7,28 +7,25 @@ Massimo's room thermostat, is released through the Marketplace,
 and replaces `maxcube` on breno.
 Each block requires the Massimo feature it uses, by name, from `/healthz`.
 
-- devices, sensors, key locks, release mechanics → done (Blocks 1, 2)
-- rooms → nothing → a room device per virtual wall thermostat (VWT),
-  `?devices=all`; a `climate` on it: Massimo's room temperature, modes
-  `auto`/`heat`/`off`, presets eco, comfort, away; `set_vacation`;
-  `temp_method` (requires `vwt`)
-- boost → nothing → the preset `boost` (requires `boost`)
-- programmes → none → get, set, copy with the ETag, `program_changed`
-  (requires `program_etag`)
+- devices, release mechanics, rooms, boost, programmes → done (Blocks 1-5)
+- brand images → none → the mark (`grayorange`, the "i" dotted orange) in
+  `custom_components/massimo/brand/`, from Massimo's `tools/brand/`,
+  trimmed to the mark (D27-A), now (D28-A)
 - card → none → Massimo's element from the connected server
 - release → none → `changelog.sh cut`, a signed tag, a GitHub release, the
-  Marketplace; HACS kept for 2026.10; the mark D13-Z4
+  Marketplace; HACS kept for 2026.10
 
 ### Blocks
 
 1. Devices and their entities - done
 2. Release mechanics - done
-3. Rooms: room devices, `climate`, `set_vacation`, `temp_method`
-4. Boost: the preset `boost`
-5. Programmes: get, set, copy with the ETag, `program_changed`
-6. Card: Massimo's element served from the connected server
-7. First release: the mark, the Marketplace, the tag
-8. Breno, on the owner's word there
+3. Rooms: room devices, `climate`, `set_vacation`, `temp_method` - done
+4. Boost: the preset `boost` - done
+5. Programmes: get, set, copy with the ETag, `program_changed` - done
+6. Brand images: Massimo's tool trims them; the eight in `brand/`
+7. Card: Massimo's element served from the connected server
+8. First release: the Marketplace, the tag
+9. Breno, on the owner's word there
 
 ## Discussion
 
@@ -81,15 +78,20 @@ Apache-2.0; the repository is public.
   What a server supports is `features` in `/healthz`:
   each name with a version `"MAJOR.MINOR"`, the minor rising with a
   compatible addition, the map the running server's.
-- **D13-Z4.**
+- **D13-Z4, as chosen since** (2026-11-13).
   One mark for Massimo and the integration, which the owner, as the licence
   holder of both, allows the integration to carry under Apache-2.0:
   a bold M with round corners in Massimo's blue (`#1F63C6`; `#5B95EC` on dark
-  backgrounds), its V at a right angle with clock hands cut along its arms,
-  a thermometer cut out of each leg with a five-step scale.
-  Its exports come from one generator kept outside the repository until
-  Block 7; the logo's typeface is provisional (Lato Regular);
-  Massimo's new icon is Massimo's change.
+  backgrounds), its V at a right angle, a thermometer cut out of each leg with
+  a five-step scale.
+  The chosen flavour is `grayorange`: a gray M behind (`#8F8F8F`; `#555555`
+  on dark backgrounds), so that every cut-out shows gray on any page;
+  the minute hand the MAX! logo's exclamation mark and the hour hand a
+  capsule, both orange (`#ED6E21`), the hub's square turning with the minute
+  hand; the logo the mark as the M of "Massimo", its "i" dotted orange,
+  in Lato Regular.
+  The generator is Massimo's `tools/brand/make_brand.py` (its AP Brand,
+  #215); this repository carries only the images it makes.
 - **D15-A.**
   The first release is published in Home Assistant's Marketplace;
   `hacs.json` stays for Home Assistant 2026.10, where HACS still installs,
@@ -99,6 +101,16 @@ Apache-2.0; the repository is public.
   (decided while Massimo's boost waited; kept for two smaller changes).
 - **D20-A.**
   This session writes the plan's revisions.
+  v1.4 was written by the session that designed the mark, on the owner's
+  `PLAN++` there.
+- **D27-A.**
+  Home Assistant's brand images are trimmed to the mark, as its brand rules
+  ask: Massimo's tool does it in its `homeassistant` scope.
+- **D28-A.**
+  The brand images come now, a block of their own before the card,
+  not with the first release.
+- **D29-A.**
+  That block is done in a worktree of its own, on a branch from `origin/main`.
 - **Areas.**
   Every device suggests its room's name as its area, once;
   the areas stay the owner's.
@@ -147,6 +159,19 @@ presets `eco`, `comfort`, `away`, `boost`, `none`;
 An entity service is registered on the platform with a `probatio` schema,
 as core's climate integrations do.
 
+**Brand images** (Home Assistant 2026.10, `homeassistant/components/brands`):
+a custom integration's `brand/` holds `icon.png`, `logo.png`, their `@2x`
+and their `dark_` ones; a missing one falls back (`logo` to `icon`, `dark_` to
+the light one); Home Assistant serves them through its brands view, and the
+loader says `has_branding` where `brand/` is there.
+Its code checks the names, not the sizes; the brand rules ask for an icon of
+1:1 at 256 px (512 at `@2x`), a logo whose short side is 128 to 256 px,
+transparent, trimmed.
+Massimo's tool writes them from its drawing; its images of #215 keep a
+margin (13 px left and right, 22 px top and bottom of the icon at 256 px).
+Its v1.1.0, on the branch `claude/web-brand` of Massimo's AP WebBrand, adds
+the web UI's files and leaves the others' bytes as they were.
+
 **Tests** run on Massimo's fixture `rooms`:
 room 1 "Wohnen", a wall thermostat at 21.4 °C and two radiator thermostats;
 room 2 "Schlafen", three radiator thermostats at 19.0, 19.5 and 23.5;
@@ -170,7 +195,9 @@ a device names its Cube by its device id.
 Merged as #2: `changelog.sh cut` writes `manifest.json`'s `version`;
 `CONTRIBUTING.md`.
 
-### Block 3: Rooms
+### Block 3: Rooms - done
+
+Merged as #5, as NOTE v1.3 "how blocks 3 and 4 went" records.
 
 1. **Features:** the coordinator keeps the server's `features`;
    the client retries a lost write only where `idempotency` is listed.
@@ -211,7 +238,9 @@ Merged as #2: `changelog.sh cut` writes `manifest.json`'s `version`;
 **Verification:**
 the test gate and lint of the contract; hassfest.
 
-### Block 4: Boost
+### Block 4: Boost - done
+
+Merged as #5.
 
 1. The preset `boost` where `boost` 1.x is listed: `{"mode": "boost"}`;
    shown while any thermostat of the room boosts.
@@ -221,7 +250,9 @@ the test gate and lint of the contract; hassfest.
 **Verification:**
 as Block 3.
 
-### Block 5: Programmes
+### Block 5: Programmes - done
+
+Merged as #6.
 
 Requires `program_etag` 1.x.
 
@@ -236,7 +267,25 @@ Requires `program_etag` 1.x.
 **Verification:**
 as Block 3.
 
-### Block 6: Card
+### Block 6: Brand images
+
+1. **Massimo** (its own plan, on `claude/web-brand`, a pull request stacked
+   on it): the tool's `homeassistant` scope writes the images trimmed to the
+   mark - the icon a square on the mark's wider side, the logo without a
+   margin.
+2. **Here:** the eight images Massimo's tool writes with
+   `--flavour grayorange --scope homeassistant` in
+   `custom_components/massimo/brand/`.
+3. **A test** that Home Assistant's loader finds the integration's brand
+   images, and that they have the names and sizes the brand rules ask.
+4. **`CONTRIBUTING.md`:** where the images come from, and how to make them
+   again.
+5. **CHANGELOG fragment** under `Added`.
+
+**Verification:**
+the test gate and lint of the contract; hassfest.
+
+### Block 7: Card
 
 1. A view that passes on Massimo's `week-program.js` and its translations
    from the entry's server, kept per Massimo version (D4).
@@ -250,23 +299,20 @@ as Block 3.
 **Verification:**
 as Block 3, and the card on a Home Assistant at 1100 and 390 px.
 
-### Block 7: First release
+### Block 8: First release
 
-1. The mark (D13-Z4) in `custom_components/massimo/brand/`:
-   `icon.png`, `icon@2x.png`, `dark_icon.png`, `dark_icon@2x.png`,
-   `logo.png`, `logo@2x.png`, `dark_logo.png`, `dark_logo@2x.png`.
-2. The Marketplace (D15-A): its publisher requirements, read when the block
+1. The Marketplace (D15-A): its publisher requirements, read when the block
    runs; the manifest's category, which 2026.11 introduces.
    HACS for 2026.10: `hacs.json`, the repository's topics, CI's HACS check
    without its `ignore`, kept as long as `hacs.json` is.
-3. The tests on 2026.11 too, once `pytest-homeassistant-custom-component`
+2. The tests on 2026.11 too, once `pytest-homeassistant-custom-component`
    has a version for it.
-4. The first release by D3; the Marketplace listing.
+3. The first release by D3; the Marketplace listing.
 
 **Verification:**
 CI; an install from the Marketplace and through HACS on 2026.10.
 
-### Block 8: Breno
+### Block 9: Breno
 
 On the owner's word in that session:
 the integration installed in the breno Pi's Home Assistant,
@@ -278,18 +324,19 @@ a setpoint from Home Assistant seen in Massimo's log.
 
 ## Proposed commit message
 
-For the revision, committed on its own before Block 3:
+For the revision, committed on its own before Block 6:
 
 ```
-chore(aps): +Integration v1.3, -NOTE Integration v1.2 (three decisions folded)
+chore(aps): +Integration v1.4
 
-The plan with Massimo's room thermostat, boost, programme ETag and feature list on Massimo's main: each block requires its feature by name, boost a block of its own, the first release through the Marketplace with the owner's mark.
+The mark as the owner chose it, its generator in Massimo, and its brand images now, trimmed to the mark, as a block of their own before the card.
 
 Key changes:
-- Folded and removed: the NOTEs boost_as_a_block_of_its_own (D16-A), release_through_the_marketplace (D15-A) and the_icon (D13-Z4)
-- Blocks 1 and 2 done; Block 3 in steps from the measured API; boost Block 4; eight blocks
+- D13-Z4 brought up to date: the flavour grayorange with the orange-dotted i, the generator Massimo's tools/brand/
+- D27-A, D28-A, D29-A: trimmed by Massimo's tool; now, Block 6; in a worktree of its own
+- Blocks 3 to 5 done (#5, #6); the brand images Block 6, the card 7, the first release 8, breno 9
 
-File-revision-v1: GUIDELINES/wip/2026-11-12_16-45_AP_Integration_entities_services_card_release.md::v1.3::2026-11-13::TL;DR, Discussion, Analysis, Implementation Plan, Proposed commit message, Change History::Blocks 3 to 8, D13-Z4, D15-A, D16-A folded
+File-revision-v1: GUIDELINES/wip/2026-11-12_16-45_AP_Integration_entities_services_card_release.md::v1.4::2026-11-13::TL;DR, Discussion, Analysis, Implementation Plan, Proposed commit message, Change History::the brand images Block 6, D13 up to date, D27-A to D29-A
 Assisted-by: claude-code:claude-opus-5-5
 ```
 
@@ -322,3 +369,7 @@ Assisted-by: claude-code:claude-opus-5-5
   Blocks 1 and 2 done; Block 3 in steps from the measured API and
   Home Assistant's climate; boost Block 4; the first release through the
   Marketplace, with HACS for 2026.10; eight blocks.
+- v1.4 (2026-11-13): D13-Z4 as chosen since (`grayorange`, the "i" dotted
+  orange, the generator Massimo's `tools/brand/`); D27-A, D28-A, D29-A.
+  Blocks 3 to 5 done (#5, #6); the brand images a block of their own, 6,
+  trimmed by Massimo's tool; the card 7, the first release 8, breno 9.
