@@ -16,13 +16,16 @@ version "MAJOR.MINOR" (Massimo's docs/api-v1.md, GET /healthz). With
 ``vwt``, every room has a virtual wall thermostat, read with the rooms
 (``?devices=all``), and its details beside it: the room's configuration,
 its settings and its programme's tag (``GET …/devices/{vwt}``), read again
-with the rooms after a configuration change.
+with the rooms after a configuration change. Where a room's tag differs from
+the one read before, its programme changed, and the time it was seen is
+kept for the room's climate.
 """
 
 from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, override
 
 from homeassistant.config_entries import ConfigEntry
@@ -30,6 +33,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .api import DEVICES_ALL, DEVICES_REAL, MassimoAuthError, MassimoClient, MassimoError, StreamEvent
 from .const import DOMAIN, LOGGER, RECONNECT_FIRST, RECONNECT_LAST, REFRESH_KINDS, THERMOSTATS
@@ -151,6 +155,8 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
         self.last_event_id: dict[str, str] = {}
         self._refreshing: dict[str, asyncio.Task[None]] = {}
         self._warned_vwt = False
+        # When a room's programme was last seen to change, by room_key.
+        self.program_changed: dict[str, datetime] = {}
 
     @override
     async def _async_update_data(self) -> MassimoData:
@@ -266,6 +272,21 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
             self._refresh(serial)
 
     @callback
+    def _note_programs(self, serial: str, before: dict[str, dict[str, Any]], after: dict[str, dict[str, Any]]) -> None:
+        """Note the rooms whose programme's tag changed between two reads."""
+        now = dt_util.utcnow()
+        for uid, details in after.items():
+            old, new = (before.get(uid) or {}).get("etag"), details.get("etag")
+            if old and new and old != new:
+                self.program_changed[f"{serial}:{uid}"] = now
+
+    @callback
+    def refresh_rooms(self, serial: str) -> None:
+        """Read a Cube's rooms again soon, as after a write of the
+        integration's own that changes them."""
+        self._refresh(serial)
+
+    @callback
     def _refresh(self, serial: str) -> None:
         """Read a Cube's rooms again, once for a burst of events."""
         if serial in self._refreshing:
@@ -280,6 +301,7 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
             finally:
                 self._refreshing.pop(serial, None)
             if serial in self.data.cubes:
+                self._note_programs(serial, self.data.cubes[serial].details, details)
                 self.data.cubes[serial].rooms = rooms
                 self.data.cubes[serial].details = details
                 self._prune(self.data)

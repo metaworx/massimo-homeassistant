@@ -9,8 +9,9 @@ beside Massimo's own web UI and apps.
 > **Not released yet.**
 > It sets up a Massimo server, follows its Cubes,
 > shows their devices with their sensors and key locks,
-> and controls each room's heating, boost included.
-> Week programmes and a week-programme card follow.
+> controls each room's heating, boost included, and reads, writes and copies
+> its week programme.
+> A week-programme card follows.
 > Until a release, Home Assistant's own MAX! integration can control the Cube through
 > Massimo's LAN proxy,
 > as Massimo's
@@ -66,6 +67,23 @@ beside Massimo's own web UI and apps.
     then goes back to its week programme.
   - **Room temperature from** (configuration): the median or the mean of the
     radiator thermostats, for a room without a wall thermostat.
+- **Week programmes**, from a Massimo that tags them
+  (Massimo's feature `program_etag`), as actions on a room's `climate`:
+  - **Massimo: Get week programme** (`massimo.get_program`) answers the
+    room's programme, its tag, whether a write to it is still on its way,
+    and whether its thermostats agree;
+  - **Massimo: Set week programme** (`massimo.set_program`) writes days of
+    it, each 1 to 13 switch points such as `{"temp": 21, "until": "07:00"}`,
+    the last until 24:00, and answers the new tag;
+    given the tag it read, a write over a change made meanwhile
+    (in Massimo's web UI, at a thermostat) is refused instead of
+    overwriting it;
+  - **Massimo: Copy week programme** (`massimo.copy_program`) copies a
+    room's programme, or some of its days, to other rooms, or one day of a
+    room onto its other days.
+
+  The `climate`'s attributes `program_tag` and `program_changed` say which
+  programme the room has and when the integration saw it change.
 - **Re-authentication** when the key stops working.
 
 ## Setting up

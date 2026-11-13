@@ -18,3 +18,53 @@ set_vacation:
       example: "2026-12-24 18:00:00"
       selector:
         datetime:
+
+get_program:
+  target:
+    entity:
+      integration: massimo
+      domain: climate
+
+set_program:
+  target:
+    entity:
+      integration: massimo
+      domain: climate
+  fields:
+    program:
+      required: true
+      example: '{"monday": [{"temp": 17, "until": "07:00"}, {"temp": 21, "until": "22:00"}, {"temp": 17, "until": "24:00"}]}'
+      selector:
+        object:
+    etag:
+      required: false
+      example: "p34dc3ccc8014803a"
+      selector:
+        text:
+
+copy_program:
+  target:
+    entity:
+      integration: massimo
+      domain: climate
+  fields:
+    source:
+      required: false
+      selector:
+        entity:
+          integration: massimo
+          domain: climate
+    days:
+      required: false
+      selector:
+        select:
+          multiple: true
+          translation_key: day
+          options: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+    to_days:
+      required: false
+      selector:
+        select:
+          multiple: true
+          translation_key: day
+          options: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
