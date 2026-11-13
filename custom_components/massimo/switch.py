@@ -11,7 +11,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .api import MassimoDiscardedError, MassimoError
 from .const import DOMAIN, THERMOSTATS
 from .coordinator import MassimoConfigEntry
 from .entity import DeviceEntity, add_entities_as_they_come, devices_of
@@ -58,11 +57,4 @@ class KeyLock(DeviceEntity, SwitchEntity):
         if found is None:
             raise HomeAssistantError(translation_domain=DOMAIN, translation_key="device_gone")
         cube_serial, _, dev = found
-        try:
-            await self.coordinator.client.set_lock(cube_serial, dev["rf_address"], locked)
-        except MassimoDiscardedError as err:
-            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="discarded") from err
-        except MassimoError as err:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN, translation_key="write_failed", translation_placeholders={"error": str(err)}
-            ) from err
+        await self.write(self.coordinator.client.set_lock(cube_serial, dev["rf_address"], locked))

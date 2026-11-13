@@ -6,13 +6,12 @@ Cubes: Massimo keeps the Cubes, their radio budget, pairing and week programmes,
 and Home Assistant becomes one more client of its HTTP API,
 beside Massimo's own web UI and apps.
 
-> **Not ready for use yet.**
+> **Not released yet.**
 > It sets up a Massimo server, follows its Cubes,
-> and shows their devices with their sensors and key locks;
-> it sets no temperatures yet.
-> Rooms as `climate` entities, services and a week-programme card follow,
-> once Massimo has the room thermostat they are built on.
-> Until then, Home Assistant's own MAX! integration can control the Cube through
+> shows their devices with their sensors and key locks,
+> and controls each room's heating.
+> Boost, week programmes and a week-programme card follow.
+> Until a release, Home Assistant's own MAX! integration can control the Cube through
 > Massimo's LAN proxy,
 > as Massimo's
 > [docs/homeassistant.md](https://github.com/metaworx/massimo/blob/main/docs/homeassistant.md) describes.
@@ -46,6 +45,25 @@ beside Massimo's own web UI and apps.
   A device's entities are unavailable while its Cube is not connected,
   until it has reported, and while Massimo calls it stale
   (a thermostat silent for 24 hours).
+- **Rooms**, from a Massimo with virtual wall thermostats
+  (Massimo's feature `vwt`; an older one gets the devices alone, and a warning):
+  each room with a thermostat is a device of its own, in its area,
+  and stays the room's whatever thermostats come and go in it.
+  - Its **`climate`** shows the room's temperature as Massimo computes it:
+    its wall thermostat's, else the median of its radiator thermostats
+    (the attribute `temperature_sources` says which).
+    Modes: `auto` follows the week programme, `heat` holds a setpoint,
+    `off` holds 4.5 °C, which the thermostats show as off.
+    Presets: `eco` and `comfort` hold the room's eco and comfort
+    temperatures, `away` shows vacation mode, `none` goes back to the week
+    programme.
+    Every write goes through Massimo's queue to all thermostats of the room,
+    and shows once they report it.
+  - **Massimo: Set vacation** (`massimo.set_vacation`) holds a room at a
+    temperature until an end, rounded up to the half hour,
+    then goes back to its week programme.
+  - **Room temperature from** (configuration): the median or the mean of the
+    radiator thermostats, for a room without a wall thermostat.
 - **Re-authentication** when the key stops working.
 
 ## Setting up

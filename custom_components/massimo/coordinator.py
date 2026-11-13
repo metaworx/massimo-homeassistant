@@ -10,6 +10,13 @@ date, whether or not anything came meanwhile.
 
 After every read of the rooms, a device the server no longer lists leaves
 the device registry, and its entities with it.
+
+What the server supports is its health's ``features``, each name with a
+version "MAJOR.MINOR" (Massimo's docs/api-v1.md, GET /healthz). With
+``vwt``, every room has a virtual wall thermostat, read with the rooms
+(``?devices=all``), and its details beside it: the room's configuration,
+its settings and its programme's tag (``GET …/devices/{vwt}``), read again
+with the rooms after a configuration change.
 """
 
 from __future__ import annotations
@@ -24,18 +31,46 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import MassimoAuthError, MassimoClient, MassimoError, StreamEvent
-from .const import DOMAIN, LOGGER, RECONNECT_FIRST, RECONNECT_LAST, REFRESH_KINDS
+from .api import DEVICES_ALL, DEVICES_REAL, MassimoAuthError, MassimoClient, MassimoError, StreamEvent
+from .const import DOMAIN, LOGGER, RECONNECT_FIRST, RECONNECT_LAST, REFRESH_KINDS, THERMOSTATS
 
 type MassimoConfigEntry = ConfigEntry[MassimoCoordinator]
 
 
+def has_feature(server: dict[str, Any], name: str, minor: int = 0) -> bool:
+    """Whether the server's health lists a feature at major 1 and at least
+    the minor given."""
+    version = (server.get("features") or {}).get(name)
+    if not isinstance(version, str):
+        return False
+    major, _, rest = version.partition(".")
+    return major == "1" and rest.isdigit() and int(rest) >= minor
+
+
+def room_key(cube_serial: str, room: dict[str, Any]) -> str:
+    """The identifier of a room's device: its Cube and its room_uid, which
+    Massimo never gives to another room."""
+    return f"{cube_serial}:{room['room_uid']}"
+
+
+def virtual_of(room: dict[str, Any]) -> dict[str, Any] | None:
+    """A room's virtual wall thermostat, where the server has them."""
+    return next((dev for dev in room.get("devices") or [] if dev.get("virtual")), None)
+
+
+def has_thermostat(room: dict[str, Any]) -> bool:
+    """Whether a room has a real thermostat, so something to control."""
+    return any(not dev.get("virtual") and dev.get("type") in THERMOSTATS for dev in room.get("devices") or [])
+
+
 @dataclass
 class CubeData:
-    """A Cube as the API describes it, and its rooms with their devices."""
+    """A Cube as the API describes it, its rooms with their devices, and
+    each room's details by its room_uid."""
 
     info: dict[str, Any]
     rooms: list[dict[str, Any]] = field(default_factory=list)
+    details: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def device(self, rf_address: str) -> dict[str, Any] | None:
         """The device of a radio address, in whichever room it is."""
@@ -46,8 +81,18 @@ class CubeData:
         return None
 
     def devices(self) -> list[tuple[dict[str, Any], dict[str, Any]]]:
-        """Every device with a serial, with its room."""
-        return [(room, dev) for room in self.rooms for dev in room.get("devices") or [] if dev.get("serial")]
+        """Every real device with a serial, with its room; the virtual wall
+        thermostats are the rooms'."""
+        return [
+            (room, dev)
+            for room in self.rooms
+            for dev in room.get("devices") or []
+            if dev.get("serial") and not dev.get("virtual")
+        ]
+
+    def virtual_rooms(self) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        """Every room with its virtual wall thermostat."""
+        return [(room, vwt) for room in self.rooms if room.get("room_uid") and (vwt := virtual_of(room))]
 
 
 @dataclass
@@ -66,9 +111,25 @@ class MassimoData:
                     return cube_serial, room, dev
         return None
 
+    def find_room(self, cube_serial: str, room_uid: str) -> tuple[dict[str, Any], dict[str, Any]] | None:
+        """A room and its virtual wall thermostat, while the server lists
+        them."""
+        cube = self.cubes.get(cube_serial)
+        if cube is None:
+            return None
+        return next(((room, vwt) for room, vwt in cube.virtual_rooms() if room["room_uid"] == room_uid), None)
+
     def serials(self) -> set[str]:
-        """The serials of the Cubes and of their devices."""
-        return set(self.cubes) | {dev["serial"] for cube in self.cubes.values() for _, dev in cube.devices()}
+        """The identifiers of the Cubes, their real devices and their rooms."""
+        out = set(self.cubes)
+        for serial, cube in self.cubes.items():
+            out |= {dev["serial"] for _, dev in cube.devices()}
+            out |= {room_key(serial, room) for room, _ in cube.virtual_rooms()}
+        return out
+
+    def feature(self, name: str, minor: int = 0) -> bool:
+        """Whether the server lists a feature (has_feature)."""
+        return has_feature(self.server, name, minor)
 
 
 class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
@@ -89,16 +150,18 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
         # The last event id read per Cube, where its stream resumes.
         self.last_event_id: dict[str, str] = {}
         self._refreshing: dict[str, asyncio.Task[None]] = {}
+        self._warned_vwt = False
 
     @override
     async def _async_update_data(self) -> MassimoData:
         """Read the server, its Cubes and their rooms."""
         try:
             server = await self.client.health()
+            self._configure(server)
             cubes = {}
             for info in await self.client.cubes():
                 serial = info["serial"]
-                cubes[serial] = CubeData(info, await self.client.rooms(serial))
+                cubes[serial] = CubeData(info, *await self._read_rooms(serial))
         except MassimoAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except MassimoError as err:
@@ -106,6 +169,30 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
         data = MassimoData(server, cubes)
         self._prune(data)
         return data
+
+    def _configure(self, server: dict[str, Any]) -> None:
+        """Set the client to what the server supports."""
+        self.client.retry_writes = has_feature(server, "idempotency")
+        if has_feature(server, "vwt"):
+            self.client.devices = DEVICES_ALL
+            return
+        self.client.devices = DEVICES_REAL
+        if not self._warned_vwt:
+            self._warned_vwt = True
+            LOGGER.warning(
+                "%s has no virtual wall thermostats (the feature vwt): its rooms need a newer Massimo",
+                self.client.url,
+            )
+
+    async def _read_rooms(self, serial: str) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+        """A Cube's rooms, and each room's details from its virtual wall
+        thermostat; from the server's copy, without radio."""
+        rooms = await self.client.rooms(serial)
+        details = {}
+        for room in rooms:
+            if room.get("room_uid") and (vwt := virtual_of(room)):
+                details[room["room_uid"]] = await self.client.device(serial, vwt["rf_address"])
+        return rooms, details
 
     @callback
     def _prune(self, data: MassimoData) -> None:
@@ -186,7 +273,7 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
 
         async def read() -> None:
             try:
-                rooms = await self.client.rooms(serial)
+                rooms, details = await self._read_rooms(serial)
             except MassimoError as err:
                 LOGGER.debug("the rooms of %s could not be read: %s", serial, err)
                 return
@@ -194,6 +281,7 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
                 self._refreshing.pop(serial, None)
             if serial in self.data.cubes:
                 self.data.cubes[serial].rooms = rooms
+                self.data.cubes[serial].details = details
                 self._prune(self.data)
                 self.async_set_updated_data(self.data)
 

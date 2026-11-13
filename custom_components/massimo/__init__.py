@@ -17,7 +17,13 @@ from .const import DOMAIN
 from .coordinator import MassimoConfigEntry, MassimoCoordinator
 from .entity import register_cubes
 
-PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SENSOR, Platform.SWITCH]
+PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
+    Platform.CLIMATE,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: MassimoConfigEntry) -> bool:

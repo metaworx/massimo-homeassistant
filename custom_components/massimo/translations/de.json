@@ -82,6 +82,33 @@
       "key_lock": {
         "name": "Tastensperre"
       }
+    },
+    "climate": {
+      "room": {
+        "state_attributes": {
+          "consistent": {
+            "name": "Thermostate stimmen überein"
+          },
+          "temperature_sources": {
+            "name": "Gemessen von"
+          },
+          "vacation_until": {
+            "name": "Urlaub bis"
+          },
+          "pending": {
+            "name": "Funkbefehle unterwegs"
+          }
+        }
+      }
+    },
+    "select": {
+      "temp_method": {
+        "name": "Raumtemperatur aus",
+        "state": {
+          "median": "Median der Heizkörperthermostate",
+          "mean": "Mittelwert der Heizkörperthermostate"
+        }
+      }
     }
   },
   "exceptions": {
@@ -93,6 +120,31 @@
     },
     "device_gone": {
       "message": "Massimo führt dieses Gerät nicht mehr."
+    },
+    "away_needs_vacation": {
+      "message": "Abwesend ist der Urlaubsmodus, der eine Temperatur und ein Ende braucht: die Aktion Massimo: Urlaub setzen verwenden."
+    },
+    "vacation_in_past": {
+      "message": "Das Ende des Urlaubs muss in der Zukunft liegen."
+    },
+    "room_not_read": {
+      "message": "Die Temperaturen des Raums sind noch nicht gelesen."
+    }
+  },
+  "services": {
+    "set_vacation": {
+      "name": "Urlaub setzen",
+      "description": "Hält einen Raum bis zu einem Ende auf einer Temperatur und kehrt dann zu seinem Wochenprogramm zurück.",
+      "fields": {
+        "temperature": {
+          "name": "Temperatur",
+          "description": "Die zu haltende Temperatur, 4,5 bis 30,5 °C in Schritten von 0,5."
+        },
+        "end": {
+          "name": "Ende",
+          "description": "Wann der Urlaub endet, auf die halbe Stunde aufgerundet."
+        }
+      }
     }
   }
 }
