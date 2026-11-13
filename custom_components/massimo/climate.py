@@ -375,13 +375,18 @@ class RoomClimate(RoomEntity, ClimateEntity, RestoreEntity):
 
     async def async_get_program(self) -> ServiceResponse:
         """The room's week programme with its tag, whether a write to it is
-        still on its way, and whether its thermostats agree."""
+        still on its way, whether its thermostats agree, and the device it
+        was read from."""
         program = await self.read_program()
+        source = program.get("source")
+        found = self.found
+        names = {dev.get("rf_address"): dev.get("name") for dev in found[0].get("devices") or []} if found else {}
         return {
             ATTR_PROGRAM: days_of(program),
             ATTR_ETAG: program.get("etag"),
             "pending": bool(program.get("pending")),
             "consistent": program.get("program_consistent", True),
+            "source": names.get(source, source),
         }
 
     async def _write_program(self, days: dict[str, Any], etag: str | None) -> dict[str, Any]:

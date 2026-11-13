@@ -34,6 +34,10 @@ class MassimoDiscardedError(MassimoError):
     spent; nothing was sent."""
 
 
+class MassimoNotFoundError(MassimoError):
+    """The server has no such thing."""
+
+
 class MassimoChangedError(MassimoError):
     """A write named the tag of what it read, and that changed since, in
     another client, at a device, or by a write still on its way; nothing
@@ -115,6 +119,8 @@ class MassimoClient:
             except ValueError, AttributeError:
                 etag = None
             raise MassimoChangedError(f"412: {text}", etag or resp.headers.get("ETag", "").strip('"') or None)
+        if resp.status == 404:
+            raise MassimoNotFoundError(f"404: {(await resp.text()).strip()}")
         if resp.status >= 400:
             raise MassimoError(f"{resp.status}: {(await resp.text()).strip()}")
 
@@ -148,6 +154,18 @@ class MassimoClient:
         if isinstance(answer, dict) and answer.get("discarded"):
             raise MassimoDiscardedError(f"{path}: the Cube discarded the command")
         return answer
+
+    async def ui_file(self, name: str) -> tuple[bytes, str]:
+        """One of the web UI's files, which Massimo serves without sign-in,
+        such as week-program.js or i18n/de.json: its bytes and content
+        type."""
+        path = f"/ui/{name}"
+        try:
+            async with self._session.get(self.url + path, timeout=self._timeout) as resp:
+                await self._check(resp)
+                return await resp.read(), resp.content_type
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise MassimoConnectionError(f"{path}: {err}") from err
 
     async def health(self) -> dict[str, Any]:
         """The server's health: its version, start and node_id."""

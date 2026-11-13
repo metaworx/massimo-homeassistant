@@ -1,8 +1,10 @@
 {
   "domain": "massimo",
   "name": "Massimo",
+  "after_dependencies": ["frontend"],
   "codeowners": ["@martin-rueegg"],
   "config_flow": true,
+  "dependencies": ["http"],
   "documentation": "https://github.com/metaworx/massimo-homeassistant",
   "integration_type": "hub",
   "iot_class": "local_push",

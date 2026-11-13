@@ -9,9 +9,8 @@ beside Massimo's own web UI and apps.
 > **Not released yet.**
 > It sets up a Massimo server, follows its Cubes,
 > shows their devices with their sensors and key locks,
-> controls each room's heating, boost included, and reads, writes and copies
-> its week programme.
-> A week-programme card follows.
+> controls each room's heating, boost included, and edits its week programme,
+> in a card or by actions.
 > Until a release, Home Assistant's own MAX! integration can control the Cube through
 > Massimo's LAN proxy,
 > as Massimo's
@@ -84,6 +83,21 @@ beside Massimo's own web UI and apps.
 
   The `climate`'s attributes `program_tag` and `program_changed` say which
   programme the room has and when the integration saw it change.
+- **The card "Massimo week programme"** edits a room's week programme with
+  Massimo's own editor, in Home Assistant's look: add it to a dashboard and
+  choose the room. Nothing to install: the integration loads it.
+  - It sends only the days you changed, with the tag it read the programme
+    with; a programme changed meanwhile, in Massimo or at a thermostat,
+    is not overwritten: the card keeps your edits and offers to load the
+    current one.
+  - It reads the programme again by itself when it changes elsewhere and
+    you are not editing it.
+  - The editor and its texts (English, German, French, Italian, Dutch,
+    Polish) come from your Massimo server, under Massimo's own licence,
+    AGPL-3.0: the integration passes them on to a browser signed in to
+    Home Assistant, and carries none of them.
+    A page holds one version of the editor: with two Massimo servers of
+    different versions, the first one a card loads is used.
 - **Re-authentication** when the key stops working.
 
 ## Setting up
