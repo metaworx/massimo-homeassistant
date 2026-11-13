@@ -5,7 +5,11 @@ event updates its device in place; an event that changes rooms, names or
 devices, or says that events were lost (resync), reads the Cube's rooms
 again. A broken stream is opened again with the last id read, so that the
 server sends what came meanwhile instead of the whole state; while it is
-down the data counts as not up to date.
+down the data counts as not up to date, and once it is open again as up to
+date, whether or not anything came meanwhile.
+
+After every read of the rooms, a device the server no longer lists leaves
+the device registry, and its entities with it.
 """
 
 from __future__ import annotations
@@ -17,6 +21,7 @@ from typing import Any, override
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import MassimoAuthError, MassimoClient, MassimoError, StreamEvent
@@ -40,6 +45,10 @@ class CubeData:
                     return dev
         return None
 
+    def devices(self) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        """Every device with a serial, with its room."""
+        return [(room, dev) for room in self.rooms for dev in room.get("devices") or [] if dev.get("serial")]
+
 
 @dataclass
 class MassimoData:
@@ -47,6 +56,19 @@ class MassimoData:
 
     server: dict[str, Any]
     cubes: dict[str, CubeData]
+
+    def find(self, serial: str) -> tuple[str, dict[str, Any], dict[str, Any]] | None:
+        """A device by its serial, which stays the same on another Cube:
+        its Cube's serial, its room and its data."""
+        for cube_serial, cube in self.cubes.items():
+            for room, dev in cube.devices():
+                if dev["serial"] == serial:
+                    return cube_serial, room, dev
+        return None
+
+    def serials(self) -> set[str]:
+        """The serials of the Cubes and of their devices."""
+        return set(self.cubes) | {dev["serial"] for cube in self.cubes.values() for _, dev in cube.devices()}
 
 
 class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
@@ -81,7 +103,20 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
             raise ConfigEntryAuthFailed(str(err)) from err
         except MassimoError as err:
             raise UpdateFailed(str(err)) from err
-        return MassimoData(server, cubes)
+        data = MassimoData(server, cubes)
+        self._prune(data)
+        return data
+
+    @callback
+    def _prune(self, data: MassimoData) -> None:
+        """Take the devices the server no longer lists out of the registry."""
+        registry = dr.async_get(self.hass)
+        serials = data.serials()
+        for device in dr.async_entries_for_config_entry(registry, self.config_entry.entry_id):
+            ids = {ident for domain, ident in device.identifiers if domain == DOMAIN}
+            if ids and not ids & serials:
+                LOGGER.debug("%s is gone from the server", device.name)
+                registry.async_remove_device(device.id)
 
     @callback
     def start_streams(self) -> None:
@@ -98,7 +133,9 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
         while True:
             try:
                 async for event in self.client.events(serial, self.last_event_id.get(serial)):
-                    wait = RECONNECT_FIRST.total_seconds()
+                    # A stream that opens and breaks at once keeps its wait.
+                    if event.kind != "open":
+                        wait = RECONNECT_FIRST.total_seconds()
                     if event.id:
                         self.last_event_id[serial] = event.id
                     self._apply(serial, event)
@@ -116,6 +153,10 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
     @callback
     def _apply(self, serial: str, event: StreamEvent) -> None:
         """Take an event into the data."""
+        if event.kind == "open":
+            if not self.last_update_success:
+                self.async_set_updated_data(self.data)
+            return
         cube = self.data.cubes.get(serial)
         if cube is None:
             return
@@ -153,6 +194,7 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
                 self._refreshing.pop(serial, None)
             if serial in self.data.cubes:
                 self.data.cubes[serial].rooms = rooms
+                self._prune(self.data)
                 self.async_set_updated_data(self.data)
 
         self._refreshing[serial] = self.config_entry.async_create_background_task(

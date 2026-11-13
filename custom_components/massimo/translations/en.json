@@ -48,5 +48,51 @@
       "wrong_server": "The key belongs to another server.",
       "reauth_successful": "The new API key works."
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "connected": {
+        "name": "Connected"
+      },
+      "link_error": {
+        "name": "Link error"
+      },
+      "transmit_error": {
+        "name": "Transmit error"
+      }
+    },
+    "sensor": {
+      "valve": {
+        "name": "Valve"
+      },
+      "duty_cycle": {
+        "name": "Duty cycle"
+      },
+      "free_memory_slots": {
+        "name": "Free memory slots"
+      },
+      "pending_radiograms": {
+        "name": "Pending radiograms"
+      },
+      "queued": {
+        "name": "Queued commands"
+      }
+    },
+    "switch": {
+      "key_lock": {
+        "name": "Key lock"
+      }
+    }
+  },
+  "exceptions": {
+    "write_failed": {
+      "message": "Massimo did not carry out the command: {error}"
+    },
+    "discarded": {
+      "message": "The Cube discarded the command, as it does when its radio budget for the hour is spent. Try again later."
+    },
+    "device_gone": {
+      "message": "Massimo no longer lists this device."
+    }
   }
 }
