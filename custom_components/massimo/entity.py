@@ -1,10 +1,13 @@
 """The entities' common ground: the devices they belong to, and when they
 are available.
 
-A Cube is a hub, each of its devices a device of its own, found by its
-serial, which stays the same if it is paired to another Cube. A device's
-area is suggested by its room's name; Home Assistant matches or creates
-the area once, and the areas stay the owner's.
+A Cube is a hub, registered when the entry is set up, and each of its
+devices a device of its own beneath it, found by its serial, which stays the
+same if it is paired to another Cube. A device names its Cube by the Cube's
+device id (``via_device_id``): the identifier form, ``via_device``, is
+deprecated, to be removed in Home Assistant 2027.8. A device's area is
+suggested by its room's name; Home Assistant matches or creates the area
+once, and the areas stay the owner's.
 """
 
 from __future__ import annotations
@@ -12,6 +15,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import Any, override
 
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity, EntityDescription
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -19,6 +23,29 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, MANUFACTURER, MODELS
 from .coordinator import CubeData, MassimoConfigEntry, MassimoCoordinator
+
+
+def cube_device(coordinator: MassimoCoordinator, serial: str) -> dict[str, Any]:
+    """A Cube's device, as the device registry takes it."""
+    info = coordinator.data.cubes[serial].info
+    return {
+        "identifiers": {(DOMAIN, serial)},
+        "name": info.get("name") or serial,
+        "manufacturer": MANUFACTURER,
+        "model": "MAX! Cube",
+        "serial_number": serial,
+        "sw_version": info.get("firmware"),
+        "configuration_url": coordinator.client.url,
+    }
+
+
+def register_cubes(coordinator: MassimoCoordinator) -> None:
+    """Register the Cubes' devices, so that their devices can name them."""
+    registry = dr.async_get(coordinator.hass)
+    for serial in coordinator.data.cubes:
+        registry.async_get_or_create(
+            config_entry_id=coordinator.config_entry.entry_id, **cube_device(coordinator, serial)
+        )
 
 
 class MassimoEntity(CoordinatorEntity[MassimoCoordinator]):
@@ -36,16 +63,7 @@ class CubeEntity(MassimoEntity):
         self.cube_serial = serial
         self.entity_description = description
         self._attr_unique_id = f"{serial}_{description.key}"
-        info = coordinator.data.cubes[serial].info
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, serial)},
-            name=info.get("name") or serial,
-            manufacturer=MANUFACTURER,
-            model="MAX! Cube",
-            serial_number=serial,
-            sw_version=info.get("firmware"),
-            configuration_url=coordinator.client.url,
-        )
+        self._attr_device_info = DeviceInfo(**cube_device(coordinator, serial))
 
     @property
     def cube(self) -> CubeData | None:
@@ -73,13 +91,16 @@ class DeviceEntity(MassimoEntity):
         found = coordinator.data.find(serial)
         assert found is not None, "an entity is made for a device the data lists"
         cube_serial, room, dev = found
+        cube = dr.async_get(coordinator.hass).async_get_device_by_identifier(
+            (DOMAIN, cube_serial), coordinator.config_entry.entry_id
+        )
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, serial)},
             name=dev.get("name") or serial,
             manufacturer=MANUFACTURER,
             model=MODELS.get(dev.get("type", ""), dev.get("type")),
             serial_number=serial,
-            via_device=(DOMAIN, cube_serial),
+            via_device_id=cube.id if cube else None,
             suggested_area=room.get("name") or None,
         )
 

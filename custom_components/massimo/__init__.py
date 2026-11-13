@@ -15,17 +15,23 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import MassimoClient
 from .const import DOMAIN
 from .coordinator import MassimoConfigEntry, MassimoCoordinator
+from .entity import register_cubes
 
 PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SENSOR, Platform.SWITCH]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: MassimoConfigEntry) -> bool:
-    """Read the server, then follow its Cubes' event streams."""
+    """Read the server, then follow its Cubes' event streams.
+
+    Returns True: Home Assistant 2026.10 requires a boolean, and 2026.11,
+    which asks for None, ignores one from a custom integration.
+    """
     session = async_get_clientsession(hass, verify_ssl=entry.data.get(CONF_VERIFY_SSL, True))
     client = MassimoClient(session, entry.data[CONF_URL], entry.data.get(CONF_API_KEY))
     coordinator = MassimoCoordinator(hass, entry, client)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
+    register_cubes(coordinator)
     coordinator.start_streams()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
