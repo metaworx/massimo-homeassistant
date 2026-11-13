@@ -16,10 +16,9 @@ cd massimo-homeassistant
 uv python install 3.14
 uv venv --python-preference only-managed --python 3.14 .venv
 VIRTUAL_ENV=.venv uv pip install -r requirements_test.txt
-# a massimo binary and the fake Cube's greeting, from Massimo's checkout:
+# a massimo binary, built from Massimo's main:
 (cd ../massimo && go build -o /tmp/massimo ./cmd/massimo)
-MASSIMO_REQUIRED=1 MASSIMO_BIN=/tmp/massimo \
-MASSIMO_GREETING=../massimo/tools/ui-test/greeting.txt .venv/bin/python -m pytest
+MASSIMO_REQUIRED=1 MASSIMO_BIN=/tmp/massimo .venv/bin/python -m pytest
 ```
 
 To try it in a Home Assistant, copy `custom_components/massimo` into its

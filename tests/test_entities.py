@@ -17,7 +17,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.massimo.api import MassimoConnectionError, StreamEvent
 from custom_components.massimo.const import DOMAIN
 
-from .conftest import Server, http
+from .conftest import Server, http, rooms, set_state
 
 
 async def _setup(hass: HomeAssistant, server: Server) -> MockConfigEntry:
@@ -55,9 +55,16 @@ async def _until(hass: HomeAssistant, holds: Callable[[], bool], what: str, seco
     raise AssertionError(what)
 
 
+def _number(hass: HomeAssistant, entity_id: str) -> float | None:
+    """An entity's state as a number, or None where it has none."""
+    try:
+        return float(hass.states.get(entity_id).state)
+    except ValueError:
+        return None
+
+
 def _devices(server: Server) -> list[tuple[dict, dict]]:
-    rooms = http("GET", f"{server.url}/api/v1/cubes/{server.serial}/rooms", server.owner)
-    return [(room, dev) for room in rooms for dev in room.get("devices") or []]  # type: ignore[union-attr]
+    return [(room, dev) for room in rooms(server) for dev in room.get("devices") or []]
 
 
 def _first(server: Server, kind: str) -> tuple[dict, dict]:
@@ -110,27 +117,64 @@ async def test_the_entities_show_the_devices(hass: HomeAssistant, massimo_server
     await _unload(hass, entry)
 
 
+async def test_a_wall_thermostat(hass: HomeAssistant, massimo_server: Server, socket_enabled: None) -> None:
+    """A wall thermostat is a device of its own, with its temperature and
+    key lock, and no valve."""
+    entry = await _setup(hass, massimo_server)
+    _, wall = _first(massimo_server, "wall_thermostat")
+    serial = wall["serial"]
+    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, serial), entry.entry_id)
+    assert device is not None and device.model == "MAX! Wall Thermostat+"
+    temperature = hass.states.get(_entity(hass, "sensor", f"{serial}_temperature"))
+    assert float(temperature.state) == wall["state"]["actual_temp"]
+    assert hass.states.get(_entity(hass, "switch", f"{serial}_key_lock")) is not None
+    assert er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{serial}_valve") is None
+    await _unload(hass, entry)
+
+
 async def test_the_key_lock_writes_through_massimo(
     hass: HomeAssistant, massimo_server: Server, socket_enabled: None
 ) -> None:
     """Turning the key lock on sends Massimo's lock command for the
-    thermostat, as the audit shows; off unlocks it again."""
+    thermostat, as the audit shows, and the switch is on once the thermostat
+    reports it locked; off unlocks it again."""
     entry = await _setup(hass, massimo_server)
     _, thermostat = _first(massimo_server, "radiator_thermostat")
     lock = _entity(hass, "switch", f"{thermostat['serial']}_key_lock")
+    assert hass.states.get(lock).state == STATE_OFF
 
     def locks() -> list[dict]:
         rows = http("GET", f"{massimo_server.url}/api/v1/audit?user=homeassistant&limit=50", massimo_server.owner)
         return [r for r in rows if r["action"] == "device.lock"]  # type: ignore[union-attr]
 
     before = len(await hass.async_add_executor_job(locks))
-    for service, locked in (("turn_on", True), ("turn_off", False)):
+    for service, locked, shown in (("turn_on", True, STATE_ON), ("turn_off", False, STATE_OFF)):
         await hass.services.async_call("switch", service, {"entity_id": lock}, blocking=True)
         rows = await hass.async_add_executor_job(locks)
         assert rows[0]["target"] == f"device:{thermostat['serial']}"
         assert rows[0]["detail"]["body"] == {"locked": locked}
         assert rows[0]["result"] == "ok"
+        await _until(hass, lambda shown=shown: hass.states.get(lock).state == shown, f"the switch shows {shown}")
     assert len(await hass.async_add_executor_job(locks)) == before + 2
+    await _unload(hass, entry)
+
+
+async def test_a_report_reaches_its_entities(hass: HomeAssistant, massimo_server: Server, socket_enabled: None) -> None:
+    """A thermostat's report reaches its sensors through the stream; a device
+    the Cube holds no state for is unavailable until it reports again."""
+    entry = await _setup(hass, massimo_server)
+    _, thermostat = _first(massimo_server, "radiator_thermostat")
+    rf, serial = thermostat["rf_address"], thermostat["serial"]
+    temperature = _entity(hass, "sensor", f"{serial}_temperature")
+    before = thermostat["state"]["actual_temp"]
+    try:
+        await hass.async_add_executor_job(lambda: set_state(massimo_server, rf, actual_temp=before + 1.5))
+        await _until(hass, lambda: _number(hass, temperature) == before + 1.5, "the new temperature arrived")
+        await hass.async_add_executor_job(lambda: set_state(massimo_server, rf, reported=False))
+        await _until(hass, lambda: hass.states.get(temperature).state == STATE_UNAVAILABLE, "unavailable unreported")
+    finally:
+        await hass.async_add_executor_job(lambda: set_state(massimo_server, rf, reported=True, actual_temp=before))
+    await _until(hass, lambda: _number(hass, temperature) == before, "available once it reported")
     await _unload(hass, entry)
 
 

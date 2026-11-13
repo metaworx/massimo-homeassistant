@@ -15,7 +15,7 @@ from custom_components.massimo.api import (
     StreamEvent,
 )
 
-from .conftest import Server, http, thermostat_room
+from .conftest import Server, http, rooms, thermostat_room
 
 
 async def _events(client: MassimoClient, serial: str, last: str | None, want, seconds: float = 15) -> list[StreamEvent]:
@@ -88,8 +88,8 @@ async def test_the_stream_resumes(massimo_server: Server, socket_enabled: None) 
         last = first[-1].id
         if not last:
             pytest.skip("this Massimo's event stream has no ids yet")
-        # The fake Cube changes no state on a setpoint, but a rename is a
-        # metadata write the server announces (metadata, change).
+        # A rename is a metadata write the server announces (metadata,
+        # change).
         room = thermostat_room(srv)
         name = f"Room {secrets.token_hex(3)}"
         async with session.put(
@@ -141,8 +141,7 @@ async def test_a_write_lost_on_its_way_back_is_retried_once(massimo_server: Serv
     Idempotency-Key: the server answers the first one's outcome and runs
     the command once."""
     srv = massimo_server
-    rooms = http("GET", f"{srv.url}/api/v1/cubes/{srv.serial}/rooms", srv.owner)
-    rf = next(d["rf_address"] for r in rooms for d in r.get("devices") or [] if "thermostat" in d["type"])  # type: ignore[union-attr]
+    rf = next(d["rf_address"] for r in rooms(srv) for d in r.get("devices") or [] if "thermostat" in d["type"])
 
     def locks() -> int:
         rows = http("GET", f"{srv.url}/api/v1/audit?user=homeassistant&limit=50", srv.owner)
