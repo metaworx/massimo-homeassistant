@@ -1,0 +1,244 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Massimo",
+        "description": "The Massimo server that holds your MAX! Cubes.",
+        "data": {
+          "url": "URL",
+          "api_key": "API key",
+          "verify_ssl": "Verify the certificate"
+        },
+        "data_description": {
+          "url": "The address at which a browser opens Massimo's web UI, with its scheme and port",
+          "api_key": "An API key of a Massimo user with the role integration (System settings → Users); empty for a server without users",
+          "verify_ssl": "Off only for a server whose certificate it made itself"
+        }
+      },
+      "zeroconf_confirm": {
+        "title": "Massimo",
+        "description": "Massimo {name} was found at {url}. Give it an API key to set it up.",
+        "data": {
+          "api_key": "API key"
+        },
+        "data_description": {
+          "api_key": "An API key of a Massimo user with the role integration (System settings → Users); empty for a server without users"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Massimo",
+        "description": "The API key for {url} no longer works. Give a new one.",
+        "data": {
+          "api_key": "API key"
+        },
+        "data_description": {
+          "api_key": "An API key of a Massimo user with the role integration (System settings → Users); empty for a server without users"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "The server cannot be reached.",
+      "invalid_auth": "The API key is wrong, revoked, or may not read.",
+      "unknown": "The server answered unexpectedly."
+    },
+    "abort": {
+      "already_configured": "This server is already set up.",
+      "not_massimo": "This is not a Massimo server.",
+      "wrong_server": "The key belongs to another server.",
+      "reauth_successful": "The new API key works."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "connected": {
+        "name": "Connected"
+      },
+      "link_error": {
+        "name": "Link error"
+      },
+      "transmit_error": {
+        "name": "Transmit error"
+      }
+    },
+    "sensor": {
+      "valve": {
+        "name": "Valve"
+      },
+      "duty_cycle": {
+        "name": "Duty cycle"
+      },
+      "free_memory_slots": {
+        "name": "Free memory slots"
+      },
+      "pending_radiograms": {
+        "name": "Pending radiograms"
+      },
+      "queued": {
+        "name": "Queued commands"
+      }
+    },
+    "switch": {
+      "key_lock": {
+        "name": "Key lock"
+      }
+    },
+    "climate": {
+      "room": {
+        "state_attributes": {
+          "consistent": {
+            "name": "Thermostats agree"
+          },
+          "temperature_sources": {
+            "name": "Measured by"
+          },
+          "vacation_until": {
+            "name": "Vacation until"
+          },
+          "pending": {
+            "name": "Radiograms on their way"
+          },
+          "program_tag": {
+            "name": "Programme tag"
+          },
+          "program_changed": {
+            "name": "Programme changed"
+          }
+        }
+      }
+    },
+    "select": {
+      "temp_method": {
+        "name": "Room temperature from",
+        "state": {
+          "median": "Median of the radiator thermostats",
+          "mean": "Mean of the radiator thermostats"
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "write_failed": {
+      "message": "Massimo did not carry out the command: {error}"
+    },
+    "discarded": {
+      "message": "The Cube discarded the command, as it does when its radio budget for the hour is spent. Try again later."
+    },
+    "device_gone": {
+      "message": "Massimo no longer lists this device."
+    },
+    "away_needs_vacation": {
+      "message": "Away is vacation mode, which needs a temperature and an end: use the action Massimo: Set vacation."
+    },
+    "vacation_in_past": {
+      "message": "The vacation's end must lie in the future."
+    },
+    "room_not_read": {
+      "message": "The room's temperatures have not been read yet."
+    },
+    "program_needs_newer_massimo": {
+      "message": "Week programmes need a Massimo that tags them (the feature program_etag)."
+    },
+    "program_changed_meanwhile": {
+      "message": "The week programme changed since it was read, in another client, at a thermostat, or by a write still on its way. Read it again, then write."
+    },
+    "not_a_room": {
+      "message": "{entity_id} is not a Massimo room."
+    },
+    "program_source": {
+      "message": "{source} is not a Massimo room."
+    },
+    "program_copy_nothing": {
+      "message": "Name a room to copy from, or the days to copy a day onto."
+    },
+    "program_copy_one_day": {
+      "message": "To copy onto other days, name exactly one day to copy."
+    },
+    "program_empty": {
+      "message": "The programme names no day."
+    },
+    "program_day": {
+      "message": "{day} is not a weekday: monday to sunday."
+    },
+    "program_points": {
+      "message": "{day} needs 1 to {max} switch points."
+    },
+    "program_point": {
+      "message": "Each switch point of {day} needs a temp and an until."
+    },
+    "program_temp": {
+      "message": "{day}: {temp} is not a temperature from 4.5 to 30.5 °C in steps of 0.5."
+    },
+    "program_time": {
+      "message": "{day}: {until} is not a time HH:MM later than the one before, in steps of five minutes."
+    },
+    "program_end": {
+      "message": "{day}'s last switch point must end at 24:00."
+    }
+  },
+  "services": {
+    "set_vacation": {
+      "name": "Set vacation",
+      "description": "Holds a room at a temperature until an end, then goes back to its week programme.",
+      "fields": {
+        "temperature": {
+          "name": "Temperature",
+          "description": "The temperature to hold, 4.5 to 30.5 °C in steps of 0.5."
+        },
+        "end": {
+          "name": "End",
+          "description": "When the vacation ends, rounded up to the half hour."
+        }
+      }
+    },
+    "get_program": {
+      "name": "Get week programme",
+      "description": "Reads a room's week programme with its tag, which a write names so that it cannot overwrite a change made meanwhile."
+    },
+    "set_program": {
+      "name": "Set week programme",
+      "description": "Writes days of a room's week programme, each 1 to 13 switch points, the last until 24:00.",
+      "fields": {
+        "program": {
+          "name": "Programme",
+          "description": "Days by name, each a list of switch points with a temperature, temp, and the time it holds until, until: 21 until 07:00."
+        },
+        "etag": {
+          "name": "Tag",
+          "description": "The tag the programme was read with; a programme changed since is not overwritten."
+        }
+      }
+    },
+    "copy_program": {
+      "name": "Copy week programme",
+      "description": "Copies a room's week programme, or some of its days, to the rooms chosen; or one day of a room onto its other days.",
+      "fields": {
+        "source": {
+          "name": "From room",
+          "description": "The room to copy from; the room itself where a day is copied onto others."
+        },
+        "days": {
+          "name": "Days",
+          "description": "The days to copy; all where none are chosen. One day where it is copied onto others."
+        },
+        "to_days": {
+          "name": "Onto days",
+          "description": "The days the one day chosen is copied onto."
+        }
+      }
+    }
+  },
+  "selector": {
+    "day": {
+      "options": {
+        "monday": "Monday",
+        "tuesday": "Tuesday",
+        "wednesday": "Wednesday",
+        "thursday": "Thursday",
+        "friday": "Friday",
+        "saturday": "Saturday",
+        "sunday": "Sunday"
+      }
+    }
+  }
+}

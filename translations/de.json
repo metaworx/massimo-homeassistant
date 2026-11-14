@@ -1,0 +1,244 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Massimo",
+        "description": "Der Massimo-Server, der Ihre MAX! Cubes hält.",
+        "data": {
+          "url": "URL",
+          "api_key": "API-Schlüssel",
+          "verify_ssl": "Zertifikat prüfen"
+        },
+        "data_description": {
+          "url": "Die Adresse, unter der ein Browser die Weboberfläche von Massimo öffnet, mit Schema und Port",
+          "api_key": "Ein API-Schlüssel eines Massimo-Benutzers mit der Rolle integration (Systemeinstellungen → Benutzer); leer für einen Server ohne Benutzer",
+          "verify_ssl": "Nur aus für einen Server mit selbst erstelltem Zertifikat"
+        }
+      },
+      "zeroconf_confirm": {
+        "title": "Massimo",
+        "description": "Massimo {name} wurde unter {url} gefunden. Geben Sie einen API-Schlüssel an, um es einzurichten.",
+        "data": {
+          "api_key": "API-Schlüssel"
+        },
+        "data_description": {
+          "api_key": "Ein API-Schlüssel eines Massimo-Benutzers mit der Rolle integration (Systemeinstellungen → Benutzer); leer für einen Server ohne Benutzer"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Massimo",
+        "description": "Der API-Schlüssel für {url} gilt nicht mehr. Geben Sie einen neuen an.",
+        "data": {
+          "api_key": "API-Schlüssel"
+        },
+        "data_description": {
+          "api_key": "Ein API-Schlüssel eines Massimo-Benutzers mit der Rolle integration (Systemeinstellungen → Benutzer); leer für einen Server ohne Benutzer"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Der Server ist nicht erreichbar.",
+      "invalid_auth": "Der API-Schlüssel ist falsch, widerrufen oder darf nicht lesen.",
+      "unknown": "Der Server hat unerwartet geantwortet."
+    },
+    "abort": {
+      "already_configured": "Dieser Server ist bereits eingerichtet.",
+      "not_massimo": "Das ist kein Massimo-Server.",
+      "wrong_server": "Der Schlüssel gehört zu einem anderen Server.",
+      "reauth_successful": "Der neue API-Schlüssel funktioniert."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "connected": {
+        "name": "Verbunden"
+      },
+      "link_error": {
+        "name": "Verbindungsfehler"
+      },
+      "transmit_error": {
+        "name": "Übertragungsfehler"
+      }
+    },
+    "sensor": {
+      "valve": {
+        "name": "Ventil"
+      },
+      "duty_cycle": {
+        "name": "Funkauslastung"
+      },
+      "free_memory_slots": {
+        "name": "Freie Speicherplätze"
+      },
+      "pending_radiograms": {
+        "name": "Ausstehende Funkbefehle"
+      },
+      "queued": {
+        "name": "Wartende Befehle"
+      }
+    },
+    "switch": {
+      "key_lock": {
+        "name": "Tastensperre"
+      }
+    },
+    "climate": {
+      "room": {
+        "state_attributes": {
+          "consistent": {
+            "name": "Thermostate stimmen überein"
+          },
+          "temperature_sources": {
+            "name": "Gemessen von"
+          },
+          "vacation_until": {
+            "name": "Urlaub bis"
+          },
+          "pending": {
+            "name": "Funkbefehle unterwegs"
+          },
+          "program_tag": {
+            "name": "Programm-Kennung"
+          },
+          "program_changed": {
+            "name": "Programm geändert"
+          }
+        }
+      }
+    },
+    "select": {
+      "temp_method": {
+        "name": "Raumtemperatur aus",
+        "state": {
+          "median": "Median der Heizkörperthermostate",
+          "mean": "Mittelwert der Heizkörperthermostate"
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "write_failed": {
+      "message": "Massimo hat den Befehl nicht ausgeführt: {error}"
+    },
+    "discarded": {
+      "message": "Der Cube hat den Befehl verworfen, wie er es tut, wenn sein Funkbudget für die Stunde aufgebraucht ist. Später erneut versuchen."
+    },
+    "device_gone": {
+      "message": "Massimo führt dieses Gerät nicht mehr."
+    },
+    "away_needs_vacation": {
+      "message": "Abwesend ist der Urlaubsmodus, der eine Temperatur und ein Ende braucht: die Aktion Massimo: Urlaub setzen verwenden."
+    },
+    "vacation_in_past": {
+      "message": "Das Ende des Urlaubs muss in der Zukunft liegen."
+    },
+    "room_not_read": {
+      "message": "Die Temperaturen des Raums sind noch nicht gelesen."
+    },
+    "program_needs_newer_massimo": {
+      "message": "Wochenprogramme brauchen ein Massimo, das sie kennzeichnet (das Merkmal program_etag)."
+    },
+    "program_changed_meanwhile": {
+      "message": "Das Wochenprogramm hat sich seit dem Lesen geändert, in einem anderen Client, an einem Thermostat oder durch einen noch laufenden Schreibvorgang. Erneut lesen, dann schreiben."
+    },
+    "not_a_room": {
+      "message": "{entity_id} ist kein Massimo-Raum."
+    },
+    "program_source": {
+      "message": "{source} ist kein Massimo-Raum."
+    },
+    "program_copy_nothing": {
+      "message": "Einen Raum nennen, aus dem kopiert wird, oder die Tage, auf die ein Tag kopiert wird."
+    },
+    "program_copy_one_day": {
+      "message": "Zum Kopieren auf andere Tage genau einen Tag zum Kopieren nennen."
+    },
+    "program_empty": {
+      "message": "Das Programm nennt keinen Tag."
+    },
+    "program_day": {
+      "message": "{day} ist kein Wochentag: monday bis sunday."
+    },
+    "program_points": {
+      "message": "{day} braucht 1 bis {max} Schaltpunkte."
+    },
+    "program_point": {
+      "message": "Jeder Schaltpunkt von {day} braucht temp und until."
+    },
+    "program_temp": {
+      "message": "{day}: {temp} ist keine Temperatur von 4,5 bis 30,5 °C in Schritten von 0,5."
+    },
+    "program_time": {
+      "message": "{day}: {until} ist keine Zeit HH:MM nach der vorigen, in Schritten von fünf Minuten."
+    },
+    "program_end": {
+      "message": "Der letzte Schaltpunkt von {day} muss um 24:00 enden."
+    }
+  },
+  "services": {
+    "set_vacation": {
+      "name": "Urlaub setzen",
+      "description": "Hält einen Raum bis zu einem Ende auf einer Temperatur und kehrt dann zu seinem Wochenprogramm zurück.",
+      "fields": {
+        "temperature": {
+          "name": "Temperatur",
+          "description": "Die zu haltende Temperatur, 4,5 bis 30,5 °C in Schritten von 0,5."
+        },
+        "end": {
+          "name": "Ende",
+          "description": "Wann der Urlaub endet, auf die halbe Stunde aufgerundet."
+        }
+      }
+    },
+    "get_program": {
+      "name": "Wochenprogramm lesen",
+      "description": "Liest das Wochenprogramm eines Raums mit seiner Kennung, die ein Schreibvorgang nennt, damit er keine zwischenzeitliche Änderung überschreibt."
+    },
+    "set_program": {
+      "name": "Wochenprogramm schreiben",
+      "description": "Schreibt Tage des Wochenprogramms eines Raums, jeder mit 1 bis 13 Schaltpunkten, der letzte bis 24:00.",
+      "fields": {
+        "program": {
+          "name": "Programm",
+          "description": "Tage nach Namen, jeder eine Liste von Schaltpunkten mit einer Temperatur, temp, und der Zeit, bis zu der sie gilt, until: 21 bis 07:00."
+        },
+        "etag": {
+          "name": "Kennung",
+          "description": "Die Kennung, mit der das Programm gelesen wurde; ein seither geändertes Programm wird nicht überschrieben."
+        }
+      }
+    },
+    "copy_program": {
+      "name": "Wochenprogramm kopieren",
+      "description": "Kopiert das Wochenprogramm eines Raums oder einige seiner Tage in die gewählten Räume, oder einen Tag eines Raums auf seine anderen Tage.",
+      "fields": {
+        "source": {
+          "name": "Aus Raum",
+          "description": "Der Raum, aus dem kopiert wird; der Raum selbst, wenn ein Tag auf andere kopiert wird."
+        },
+        "days": {
+          "name": "Tage",
+          "description": "Die zu kopierenden Tage; alle, wenn keiner gewählt ist. Ein Tag, wenn er auf andere kopiert wird."
+        },
+        "to_days": {
+          "name": "Auf Tage",
+          "description": "Die Tage, auf die der gewählte Tag kopiert wird."
+        }
+      }
+    }
+  },
+  "selector": {
+    "day": {
+      "options": {
+        "monday": "Montag",
+        "tuesday": "Dienstag",
+        "wednesday": "Mittwoch",
+        "thursday": "Donnerstag",
+        "friday": "Freitag",
+        "saturday": "Samstag",
+        "sunday": "Sonntag"
+      }
+    }
+  }
+}
