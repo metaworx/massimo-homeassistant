@@ -19,7 +19,9 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any, override
 
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.auth.permissions.const import POLICY_READ
+from homeassistant.core import Context, HomeAssistant
+from homeassistant.exceptions import HomeAssistantError, Unauthorized, UnknownUser
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity, EntityDescription
@@ -43,6 +45,28 @@ def cube_device(coordinator: MassimoCoordinator, serial: str) -> dict[str, Any]:
         "sw_version": info.get("firmware"),
         "configuration_url": coordinator.client.url,
     }
+
+
+async def read_access(hass: HomeAssistant, context: Context | None) -> Callable[[str], bool]:
+    """Whether a call's user may read an entity: a call without a user is
+    the system's, and an administrator may read everything."""
+    if context is None or not context.user_id:
+        return lambda _: True
+    user = await hass.auth.async_get_user(context.user_id)
+    if user is None:
+        raise UnknownUser(context=context, user_id=context.user_id, permission=POLICY_READ)
+    if user.is_admin:
+        return lambda _: True
+    return lambda entity_id: user.permissions.check_entity(entity_id, POLICY_READ)
+
+
+async def check_read(hass: HomeAssistant, context: Context | None, entity_ids: Iterable[str]) -> None:
+    """Refuse a call whose user may not read each entity named, as Home
+    Assistant refuses an entity service to a user who may not control one."""
+    may_read = await read_access(hass, context)
+    for entity_id in entity_ids:
+        if not may_read(entity_id):
+            raise Unauthorized(context=context, entity_id=entity_id, permission=POLICY_READ)
 
 
 def register_cubes(coordinator: MassimoCoordinator) -> None:

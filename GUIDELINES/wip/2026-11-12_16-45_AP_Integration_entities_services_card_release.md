@@ -1,4 +1,4 @@
-# AP Integration v1.5: Entities, services, card, release
+# AP Integration v1.7: Entities, services, card, release
 
 ## TL;DR
 
@@ -7,14 +7,20 @@ Massimo's room thermostat, is released through the Marketplace,
 and replaces `maxcube` on breno.
 Each block requires the Massimo feature it uses, by name, from `/healthz`.
 
-- devices, release mechanics, rooms, boost, programmes, brand images
-  → done (Blocks 1-6)
-- card → none → a Lovelace card hosting Massimo's `<massimo-week-program>`,
-  fetched with Home Assistant's sign-in from the connected server;
-  native controls in Home Assistant's theme; sends the changed days with
-  the tag, offers a reload on a change made meanwhile
-- release → none → `changelog.sh cut`, a signed tag, a GitHub release, the
-  Marketplace; HACS kept for 2026.10
+- devices, rooms, boost, programmes, brand images, card → done (1-7)
+- read access → `get_program` needs `control` (an entity service) →
+  a service of the integration checking `read`: a view-only user reads
+  the programme, the card included; `copy_program` reads its source only
+  where the user may
+- users to Massimo → not here: waits for Massimo's `integration` feature
+- distribution → a GitHub release by hand → CI: signed zip, SSH-signed
+  `distro/<channel>` branches for git, the zips on `ha.massimo.metaworx.ch`
+- channels: stable; beta (every 0.x, and `-beta`); alpha (`-alpha`);
+  devel (`main` after its tests; no GitHub release)
+- keys: release and rolling, made in `~/.ssh`, piped to `gh` (D46)
+- breno → `maxcube` (not loaded since 2026-11-12) → the integration from
+  `distro/devel`, before the first release
+- release → 0.1.0, beta, a pre-release; Marketplace and HACS
 
 ### Blocks
 
@@ -24,9 +30,12 @@ Each block requires the Massimo feature it uses, by name, from `/healthz`.
 4. Boost: the preset `boost` - done
 5. Programmes: get, set, copy with the ETag, `program_changed` - done
 6. Brand images - done
-7. Card: the view for Massimo's element and texts, the card, its editor
-8. First release: the Marketplace, the tag
-9. Breno, on the owner's word there
+7. Card - done
+8. Distribution: `dist.py`, the release workflow, `distro/*`, keys, site
+9. Read access: `get_program` for a view-only user, `copy_program`'s source
+10. Breno trial: the integration from `distro/devel` on the Pi
+11. First release: 0.1.0, category, topics, the zip for HACS
+12. Breno: `maxcube` removed, the box's documentation
 
 ## Discussion
 
@@ -126,6 +135,68 @@ Apache-2.0; the repository is public.
 - **D31-A** (replaces D20-A).
   One writer per revision: the session whose block comes next,
   after fetching `main` and building on the plan there.
+- **D32-A.** `categories: ["climate.thermostats_heating"]`.
+- **D33-A.** Before the release, a check on Home Assistant 2026.11:
+  the breno trial (Block 10) is that check, the Pi running 2026.11.0;
+  the tests on 2026.11 once the harness has a version for it.
+- **D34-A.** The first version is 0.1.0; its cut ends D14's
+  "bump without a cut".
+- **D35-A, as D36 changes it.** This session cuts on a branch, with a
+  signed tag, and opens the pull request; after the merge it pushes the tag
+  at a gate of its own, and CI makes the release; the owner opens the
+  catalog pull request from their account, its text written for them.
+- **D36-A.** CI makes the GitHub release from a version tag.
+- **D38** (the owner, 2026-11-14).
+  This session works on the Pi directly for everything Home Assistant,
+  as the user `pi` (`sudo`);
+  no other configuration there is touched without the owner's prior,
+  explicit permission.
+- **D42-A.** Installs by git from `distro/<channel>`, whose root is the
+  integration's folder:
+  `git clone -b distro/<channel> … config/custom_components/massimo`.
+  `release/*` is taken: Massimo's rolling tags and its release branches.
+- **D45** (the owner, 2026-11-14).
+  Every version below 1.0.0 is a GitHub pre-release, on the channel beta,
+  or alpha where it carries `-alpha`.
+  devel has no GitHub release: it is `distro/devel`, written only from a
+  commit of `main` whose tests passed; `main` itself never goes on a box.
+- **D46** (the owner, 2026-11-14).
+  The keys are made in `~/.ssh` by this session, never shown, piped straight
+  into `gh secret set`, and kept in `~/.ssh`.
+- **D47-A.** Order: distribution (8), the breno trial (10), the first
+  release (11), `maxcube` removed (12); read access (9) added by D56.
+- **D48-A.** The channels' zips on this repository's Pages, not as
+  releases: any release is one HACS may offer.
+- **D49-A.** The `distro/*` commits are signed, the release key for
+  stable, beta and alpha, the rolling key for devel.
+- **D50** (the owner, 2026-11-14). The site is `ha.massimo.metaworx.ch`,
+  its CNAME and Pages' custom domain set by the owner.
+- **D51-A.** SSH signatures throughout: `ssh-keygen -Y sign` over each zip,
+  the same keys signing the `distro/*` commits, one allowed-signers file
+  for both checks.
+- **D52-A.** Massimo's site files are copied here under Apache-2.0,
+  as the owner, holder of both licences, allows.
+- **D53-A** (the owner, 2026-11-14).
+  Reading a programme needs view, writing it control:
+  `massimo.get_program` is a service of the integration that checks `read`
+  on each room it names, as Home Assistant checks `control` on an entity
+  service; its name, target and answer stay as they are.
+  `set_program`, `copy_program` and `set_vacation` stay entity services,
+  needing `control`.
+- **D54-A.** `copy_program` also needs `read` on the room it copies from.
+- **D55-B** (the owner, 2026-11-14), for the plan that passes users on:
+  a call without a user (an automation, a script, the system) names the
+  fixed user `system`.
+- **D56** (the owner, 2026-11-14).
+  Read access is Block 9, after Block 8 of v1.6; the trial, the release and
+  breno move down to 10 to 12.
+  Passing the Home Assistant user on to Massimo - its id and name, and the
+  call's access level, `admin`, `control` or `view` for the call's target -
+  is not this plan's: it waits for Massimo's `integration` feature on
+  Massimo's `main`, and is built as Massimo specifies it, under a plan of
+  its own.
+- **D57-B** (the owner, 2026-11-14).
+  Nothing is asked of Massimo for it yet.
 - **Areas.**
   Every device suggests its room's name as its area, once;
   the areas stay the owner's.
@@ -210,6 +281,45 @@ Home Assistant 2026.10 loads a script on every page with
 `frontend.add_extra_js_url`, serves files with
 `http.async_register_static_paths`, and signs a card's fetch with
 `hass.fetchWithAuth`.
+
+**Distribution** (2026-11-14):
+
+- **HACS** (`hacs/integration`, `repositories/base.py`; the Marketplace is
+  HACS built in) reads the releases in GitHub's order, which is newest
+  target commit first, and offers the first pre-release to whoever has
+  **Pre-release** on; with no regular release, it installs the default
+  branch's newest commit to everyone else.
+  A rolling release would always be first: hence D48-A and no devel release.
+  HACS has one switch, not channels: following a channel is git's and the
+  zips'.
+- **GitHub Pages** of this repository: build type `workflow`, the custom
+  domain `ha.massimo.metaworx.ch`; no organisation site exists whose domain
+  it would inherit.
+  Pages keeps the first deploy of a commit (Massimo's
+  `packaging/README.md`), so the site is built without state, from the
+  `distro/*` branches, on every deploy.
+- **Rulesets** let a deploy key through as a bypass actor, as Massimo's
+  `release/*` branches do; GitHub's own token is not one.
+- **The Pi** (`pi.breno.caleon.ch`): Home Assistant 2026.11.0, the container
+  `homeassistant` (`ghcr.io/home-assistant/home-assistant:stable`) on the
+  host network, `/srv/homeassistant/config` as `/config`, owned by root;
+  git there; Massimo `v0.15.0-alpha.1-153-g1b3a9a1` as a service, with
+  `features`; `maxcube` failed its setup on 2026-11-12 (the proxy refused)
+  and has not run since.
+
+**Permissions** (Home Assistant 2026.10, its `helpers/service.py` and
+`auth/permissions`):
+a user is an administrator or not; the groups are fixed
+(`system-admin`, `system-users`, `system-read-only`), and their policies
+grant `read`, `control` or `edit` per entity, without a UI.
+An entity service needs `control` on each entity a non-admin names,
+whatever it does, and offers nothing else;
+a service of the integration checks what it needs itself, from
+`call.context.user_id`, and a call without one is the system's.
+The WebSocket's `call_service` merges its `target` into the call's data,
+so the card's call reaches either kind unchanged.
+The context of a call is set on the entity before the service runs,
+so a write can tell whose it is: the later plan's starting point.
 
 **Tests** run on Massimo's fixture `rooms`:
 room 1 "Wohnen", a wall thermostat at 21.4 °C and two radiator thermostats;
@@ -361,44 +471,156 @@ the test gate and lint of the contract; hassfest.
 **Verification:**
 as Block 3, and the check by hand.
 
-### Block 8: First release
+### Block 8: Distribution
 
-1. The Marketplace (D15-A): its publisher requirements, read when the block
-   runs; the manifest's category, which 2026.11 introduces.
-   HACS for 2026.10: `hacs.json`, the repository's topics, CI's HACS check
-   without its `ignore`, kept as long as `hacs.json` is.
-2. The tests on 2026.11 too, once `pytest-homeassistant-custom-component`
-   has a version for it.
-3. The first release by D3; the Marketplace listing.
+1. **`tools/dist.py`**, without dependencies beyond Python:
+   - `meta`: from a version tag, its version, channel (D45) and whether it
+     is a pre-release, the tag checked against `manifest.json`;
+     from `main`, devel, the version `<last tag>-dev.<n>+g<sha>`
+     (`0.0.0` before the first tag);
+   - `build`: the tree - `custom_components/massimo/` with that version
+     in its `manifest.json`, and `LICENSE` - and `massimo.zip` of it,
+     stored, sorted, dated 1980: the same tree gives the same bytes;
+   - `zip`: the zip of a tree, for the site;
+   - `targets`: the channels a release goes to, its own and each less
+     stable one that holds an older version; devel alone for `main`.
+2. **Tests** of `dist.py` (`tests/test_dist.py`): the channels, the
+   versions Home Assistant's loader takes, the order of versions,
+   the same bytes twice, the manifest's version.
+3. **Keys** (D46, D51-A), each `ssh-keygen -t ed25519` in `~/.ssh`, its
+   private half piped into `gh secret set`:
+   `massimo-homeassistant-release` (environment `signing`),
+   `massimo-homeassistant-rolling` (`signing-rolling`),
+   `massimo-homeassistant-distro`, the deploy key that pushes `distro/*`
+   (both); the public halves in `keys/`, and `keys/allowed_signers`
+   naming the release and rolling keys for `git` and `file`.
+4. **Environments:** `signing`, for `v*` tags alone, its runs approved by
+   the owner; `signing-rolling`, for `main` alone; `github-pages` admitting
+   `v*` tags beside `main`.
+   **Ruleset** on `distro/*`: no deletion, no force push, creation and
+   update by a deploy key alone.
+5. **`.github/workflows/release.yml`**, called by `ci.yml` for a push of
+   `main` or a `v*` tag once every check has passed:
+   `build` (no secret) runs `dist.py`, attests the zip's provenance;
+   `sign` (in `signing` or `signing-rolling`) signs the zip, checks the
+   signature against `keys/allowed_signers`, makes the GitHub release of
+   a tag (the zip, its signature, `SHA256SUMS`, the notes from
+   `changelog.sh notes`, `--prerelease` by D45), and writes each target
+   channel's `distro/<channel>` commit - the tree and `.distro/` with the
+   version, the source commit and the zip's signature - signed, on top of
+   the branch, pushed with the deploy key;
+   then the site.
+   `ci.yml`: pushes of `v*` tags; a tag's tests also against Massimo's
+   newest release.
+6. **The site** (D50, D52-A): `site/` with Massimo's `site.css`, a home
+   page, a privacy page and `build.sh`, which builds it without state:
+   the README as a page by `md_html.py`, `keys/`, and per channel
+   `distro/<channel>.zip` and `.zip.sig`, each zip made again from its
+   branch and checked against the signature there;
+   `.github/workflows/site.yml` deploys it to Pages.
+7. **Documents:** `README.md`, installing by channel and checking a
+   download; `CONTRIBUTING.md`, "Cutting a release" without the release by
+   hand, and the keys.
 
 **Verification:**
-CI; an install from the Marketplace and through HACS on 2026.10.
+the test gate and lint of the contract; hassfest; `actionlint` where at
+hand; `site/build.sh` and `dist.py` run locally against a local
+`distro/*`; a signature made and checked with a throw-away key.
+The workflows run first when the branch is pushed and merged.
 
-### Block 9: Breno
+### Block 9: Read access
 
-On the owner's word in that session:
-the integration installed in the breno Pi's Home Assistant,
-the `maxcube` YAML removed, the box's documentation updated.
+1. `massimo.get_program` registered by the integration (D53-A), no longer
+   by the `climate` platform: the same name, a `target` of room `climate`s,
+   `SupportsResponse.ONLY`, the answer `{entity_id: {...}}` as before.
+   A non-admin caller needs `read` on each entity named, else
+   `Unauthorized`; a call without a user goes through.
+   An entity that is not a room's `climate` of this integration is refused,
+   translated.
+2. `massimo.copy_program` checks `read` on its `source` for a non-admin
+   caller (D54-A); `control` on its target stays Home Assistant's check.
+3. `services.yaml` unchanged in what it offers; the refusal's text in
+   `en.json`, `de.json` and `strings.json`.
+4. **Tests**, against the fake Cube: a read-only user reads a programme
+   through the WebSocket's `call_service` as the card calls it, and is
+   refused `set_program`; a user who may not read a room is refused
+   `get_program` and a `copy_program` from it; a call without a user and an
+   admin's read as before.
+5. **CHANGELOG fragment** under `Added`.
 
 **Verification:**
-the rooms in Home Assistant,
-a setpoint from Home Assistant seen in Massimo's log.
+the test gate, ruff, hassfest.
+
+### Block 10: Breno trial
+
+1. As `pi` on `pi.breno.caleon.ch` (D38): `distro/devel` cloned into
+   `/srv/homeassistant/config/custom_components/massimo`, its commit's
+   signature checked; `sudo docker restart homeassistant`.
+2. The owner makes a key of the role `integration` in Massimo and enters
+   it in Home Assistant's setup; the entry found by zeroconf or named.
+3. Checked: the Cube, the devices, the rooms and their `climate`s,
+   a setpoint from Home Assistant seen in Massimo's log, the card on a
+   dashboard.
+   `maxcube`'s YAML stays as it is (Block 12).
+4. A NOTE: how it went, Home Assistant 2026.11 included (D33-A).
+
+**Verification:**
+as step 3.
+
+### Block 11: First release
+
+1. `manifest.json` `categories` (D32-A); `hacs.json` with
+   `zip_release` and `filename: massimo.zip`;
+   the repository's topics; CI's HACS check without `ignore`.
+2. `README.md`: the Marketplace and HACS (Pre-release on, D45).
+3. Waits for Massimo's next tagged release with `features`:
+   the tag's tests run against it.
+4. The cut of 0.1.0 (D34-A) on a branch, its pull request (D35-A);
+   after the merge, the tag pushed at a gate of its own; CI releases.
+5. The catalog pull request's text for the owner.
+6. The tests on 2026.11 where the harness has a version by then.
+
+**Verification:**
+CI's release run; the zip installed through HACS on a scratch 2026.10.
+
+### Block 12: Breno
+
+On the owner's word: the `maxcube` YAML removed from
+`configuration.yaml`, the box's documentation updated.
+
+**Verification:**
+Home Assistant starts without `maxcube`; the rooms as in Block 10.
 
 ## Proposed commit message
 
-For the revision, committed on its own before Block 7's commit:
+For the revision, committed on its own before Block 9:
 
 ```
-chore(aps): +Integration v1.5
+chore(aps): +Integration v1.7
 
-The card in steps on main's v1.4, from the session's own v1.4 that main never had: the view, the card and its editor, and the decisions taken at its gates.
+A view-only user reads a room's week programme: read access becomes Block 9, before the trial and the release.
 
 Key changes:
-- Block 6, the brand images, done (#7)
-- Block 7, the card, in steps from Massimo's element and Home Assistant's frontend
-- D21-A, D22-A, D24-A recorded; D30-A, how the two v1.4 meet; D31-A replaces D20-A
+- Block 9: get_program a service of the integration that checks read; copy_program checks read on its source
+- Blocks 9 to 11 of v1.6 move to 10 to 12
+- D53, D54 as recommended; D55-B, D56, D57-B as the owner gave them: passing users on to Massimo waits for its integration feature
 
-File-revision-v1: GUIDELINES/wip/2026-11-12_16-45_AP_Integration_entities_services_card_release.md::v1.5::2026-11-13::TL;DR, Discussion, Analysis, Implementation Plan, Proposed commit message, Change History::Block 6 done, Block 7 in steps; D21, D22, D24, D30, D31
+File-revision-v1: GUIDELINES/wip/2026-11-12_16-45_AP_Integration_entities_services_card_release.md::v1.7::2026-11-14::TL;DR, Discussion, Analysis, Implementation Plan, Proposed commit message, Change History::read access as Block 9; D53 to D57
+Assisted-by: claude-code:claude-opus-5-5
+```
+
+For Block 9:
+
+```
+fix(integration): A view-only user reads a room's week programme
+
+massimo.get_program needed control, as every entity service does, so a user who may only view a room could not open its programme, nor use the card. It is now a service of the integration that checks read on each room it names; copy_program also checks read on the room it copies from.
+
+Key changes:
+- get_program registered by the integration, its name, target and answer as before
+- copy_program refuses a source the user may not read
+- tests with a read-only user and a user without read on a room
+
 Assisted-by: claude-code:claude-opus-5-5
 ```
 
@@ -443,3 +665,19 @@ Assisted-by: claude-code:claude-opus-5-5
   D21-A (the standard presets), D22-A (the element fetched with the
   sign-in), D24-A (the check by hand in a scratch Home Assistant);
   D31-A (one writer per revision, building on `main`) replaces D20-A.
+- v1.6 (2026-11-14): Block 7 done (#8).
+  Distribution a block of its own before the release (D47-A):
+  `dist.py`, signed zips and `distro/<channel>` branches by CI (D42-A,
+  D48-A, D49-A, D51-A), keys made here (D46), channels by version (D45),
+  the site at `ha.massimo.metaworx.ch` (D50, D52-A).
+  The breno trial from `distro/devel` before the release (D38), the release
+  after Massimo's next tagged release; `maxcube` removed last.
+  D32 to D36 as recommended; the analysis of HACS, Pages and the Pi.
+- v1.7 (2026-11-14): read access, Block 9 (D53-A, D54-A):
+  `get_program` for a view-only user, `copy_program`'s source read only
+  where the user may.
+  The trial, the release and breno move to Blocks 10 to 12 (D56), their
+  references in D33-A and D47-A with them.
+  Passing users on to Massimo left to a plan of its own, after Massimo's
+  `integration` feature (D55-B, D56, D57-B).
+  Written on the unpushed v1.6 at the owner's word, not on `main` (D31-A).

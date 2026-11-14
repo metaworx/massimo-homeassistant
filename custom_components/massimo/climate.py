@@ -20,6 +20,8 @@ Where the server tags programmes (the feature program_etag), a room's week
 programme is read with ``massimo.get_program``, written with
 ``massimo.set_program`` and copied with ``massimo.copy_program``; a write
 names the tag it read, and one over a change made meanwhile is refused.
+Reading needs view, so ``get_program`` is the integration's own service
+(services.py); the writes are this platform's, and need control.
 The attributes ``program_tag`` and ``program_changed`` say which programme
 the room has and when the integration saw it change, so that an editor
 knows when to read it again; ``program_changed`` outlasts a restart where
@@ -59,7 +61,7 @@ from homeassistant.util import dt as dt_util
 from .api import MassimoChangedError
 from .const import DOMAIN
 from .coordinator import MassimoConfigEntry, has_thermostat
-from .entity import RoomEntity, add_entities_as_they_come, rooms_of
+from .entity import RoomEntity, add_entities_as_they_come, check_read, rooms_of
 from .program import DAYS, check_days, copied, days_of
 
 # What MAX! calls off: a manual setpoint of 4.5 °C, shown as "OFF".
@@ -87,8 +89,8 @@ ROOM = ClimateEntityDescription(key="climate")
 async def async_setup_entry(
     hass: HomeAssistant, entry: MassimoConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
-    """Add a `climate` per room with a thermostat, and the vacation
-    service."""
+    """Add a `climate` per room with a thermostat, and the services that
+    write to a room."""
     coordinator = entry.runtime_data
 
     def make():
@@ -109,9 +111,6 @@ async def async_setup_entry(
             probatio.Required(ATTR_END): cv.datetime,
         },
         "async_set_vacation",
-    )
-    platform.async_register_entity_service(
-        SERVICE_GET_PROGRAM, None, "async_get_program", supports_response=SupportsResponse.ONLY
     )
     platform.async_register_entity_service(
         SERVICE_SET_PROGRAM,
@@ -417,6 +416,8 @@ class RoomClimate(RoomEntity, ClimateEntity, RestoreEntity):
         before."""
         origin: RoomClimate = self
         if source:
+            # Home Assistant checked control here; reading the source needs view.
+            await check_read(self.hass, self._context, [source])
             entity = self.hass.data[DATA_COMPONENT].get_entity(source)
             if not isinstance(entity, RoomClimate):
                 raise ServiceValidationError(
