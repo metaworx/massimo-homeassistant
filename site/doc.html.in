@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}} · Massimo for Home Assistant</title>
+<!-- A document of the repository as a page of the site, made by
+     site/build.sh (CONTRIBUTING.md, "The site"). -->
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<header class="doc-header">
+<a href="/">Massimo for Home Assistant</a>
+</header>
+<p class="doc-version">{{SOURCE_NAME}} of <code>main</code>, {{COMMIT}}: <a href="{{SOURCE}}">on GitHub</a>.</p>
+<main>
+{{BODY}}
+</main>
+<footer>
+<p><a href="/privacy.html">Privacy policy</a> · <a href="https://github.com/metaworx/massimo-homeassistant">Source on GitHub</a></p>
+</footer>
+</body>
+</html>

@@ -1,11 +1,15 @@
 # The integration's checks: Home Assistant's hassfest and HACS's
 # validation, ruff, and the tests against a real Massimo server built from
-# metaworx/massimo (main, or the ref given to a manual run).
+# metaworx/massimo (main, or the ref given to a manual run; a version tag's
+# run also against Massimo's newest release). A push of main or of a version
+# tag that passes them all is released by release.yml: main as the channel
+# devel, a tag as its version (CONTRIBUTING.md, "Releases and channels").
 name: CI
 
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
     inputs:
@@ -31,9 +35,9 @@ jobs:
       - uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
         with:
           category: integration
-          # No brand images in home-assistant/brands yet, and no topics on
-          # the repository yet: both come with the release (Block 9).
-          ignore: brands topics
+          # No topics on the repository yet: they come with the first
+          # release (AP Integration, Block 10).
+          ignore: topics
 
   lint:
     name: ruff
@@ -44,18 +48,50 @@ jobs:
         with:
           python-version: "3.14"
       - run: pip install ruff==0.17.4
-      - run: ruff check custom_components tests
-      - run: ruff format --check custom_components tests
+      - run: ruff check custom_components tests tools
+      - run: ruff format --check custom_components tests tools
+
+  # Which Massimo the tests run against: main, or the ref of a manual run;
+  # for a version tag also Massimo's newest version tag with a release, so
+  # that a release here works with a Massimo one can install.
+  massimo:
+    name: Which Massimo
+    runs-on: ubuntu-latest
+    outputs:
+      refs: ${{ steps.refs.outputs.refs }}
+    steps:
+      - id: refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ inputs.massimo_ref || 'main' }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          refs="[\"$REF\"]"
+          if [ "$IS_TAG" = true ]; then
+            newest=$(gh release list -R metaworx/massimo --exclude-drafts --limit 50 --json tagName \
+              --jq '[.[].tagName | select(startswith("v"))][0] // ""')
+            if [ -z "$newest" ]; then
+              echo "::error::Massimo has no release to test against."
+              exit 1
+            fi
+            refs="[\"$REF\", \"$newest\"]"
+          fi
+          echo "refs=$refs" | tee -a "$GITHUB_OUTPUT"
 
   test:
-    name: Tests against Massimo
+    name: Tests against Massimo ${{ matrix.massimo }}
+    needs: massimo
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        massimo: ${{ fromJSON(needs.massimo.outputs.refs) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: metaworx/massimo
-          ref: ${{ inputs.massimo_ref || 'main' }}
+          ref: ${{ matrix.massimo }}
           path: massimo
           submodules: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -75,3 +111,15 @@ jobs:
         env:
           MASSIMO_REQUIRED: "1"
         run: MASSIMO_BIN="$RUNNER_TEMP/massimo" python -m pytest -v -rs
+
+  # A push of main or of a version tag, every check passed: released.
+  release:
+    name: Release
+    needs: [hassfest, hacs, lint, test]
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      pages: write
+    uses: ./.github/workflows/release.yml

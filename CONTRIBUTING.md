@@ -69,8 +69,8 @@ docker run --rm -v "$PWD":/github/workspace ghcr.io/home-assistant/hassfest
 And lint, with ruff 0.17.4, as CI pins it:
 
 ```bash
-uvx ruff@0.17.4 check custom_components tests
-uvx ruff@0.17.4 format --check custom_components tests
+uvx ruff@0.17.4 check custom_components tests tools
+uvx ruff@0.17.4 format --check custom_components tests tools
 ```
 
 CI runs all three, and HACS's validation.
@@ -121,13 +121,72 @@ CI runs all three, and HACS's validation.
   change staged carries the bullet it owes,
   and `changelog.sh preview` shows the next release's section.
 
+## Releases and channels
+
+CI releases; nobody makes a GitHub release or writes a `distro/*` branch by
+hand.
+`ci.yml` calls `release.yml` for a push of `main` or of a version tag once
+every check has passed, and `tools/dist.py` says what the run releases:
+
+| Ref | Version | Channel | Released as |
+|-----|---------|---------|-------------|
+| `main` | `<last tag>-dev.<n>+g<commit>` (`0.0.0` before the first tag) | `devel` | `distro/devel` alone |
+| `vX.Y.Z-alpha.N` | `X.Y.Z-alpha.N` | `alpha` | a GitHub pre-release |
+| `v0.Y.Z`, `vX.Y.Z-beta.N`, `-rc.N` | as tagged | `beta` | a GitHub pre-release |
+| `vX.Y.Z`, from 1.0.0 | `X.Y.Z` | `stable` | a GitHub release |
+
+A release goes to its channel's branch `distro/<channel>`,
+and to each less stable channel that holds an older version or none:
+0.1.0 goes to `distro/beta` and `distro/alpha`.
+A branch's root is the integration's folder, with its version in
+`manifest.json`, `LICENSE`, and `.distro/` (`VERSION`, `SOURCE`, and the
+zip's signature `massimo.zip.sig`);
+each commit is on top of the last, so a clone follows it with `git pull`.
+A tag's GitHub release carries the same tree as `massimo.zip`, its signature
+and `SHA256SUMS`; `devel` has no GitHub release, since HACS offers every
+release it finds.
+
+**Keys.**
+Two keys sign, with SSH signatures (`ssh-keygen -Y sign`, namespace `file`
+for a zip, `git` for a commit), and `keys/allowed_signers` names both:
+the release key (`release@ha.massimo.metaworx.ch`) every tag's zip and
+`distro/stable`, `beta` and `alpha`,
+the rolling key (`rolling@ha.massimo.metaworx.ch`) `distro/devel`.
+Each is the secret `SIGNING_KEY` of its environment:
+`signing`, which only version tags may use and whose runs the owner
+approves, and `signing-rolling`, which only `main` may use.
+`DISTRO_DEPLOY_KEY`, in both, is the deploy key that pushes `distro/*`;
+the ruleset on `distro/*` lets nothing else create, move or delete them.
+The private halves are kept on the owner's machine, in
+`~/.ssh/massimo-homeassistant-{release,rolling,distro}`.
+A key replaced is replaced in its secret, in `keys/`, and, for the deploy
+key, in the repository's deploy keys.
+
+## The site
+
+<https://ha.massimo.metaworx.ch>, GitHub Pages of this repository,
+built by `site/build.sh` without a key and without state,
+and deployed by `.github/workflows/site.yml`, which `release.yml` calls at
+every run:
+`site/`'s pages, the README as `readme.html`, `keys/`, and per channel
+`distro/<channel>.zip` and its `.sig`.
+Each zip is made again from its branch (`tools/dist.py zip`, the same bytes
+for the same tree) and checked against the signature the branch carries,
+and each branch's commit against `keys/allowed_signers`:
+a mismatch fails the build, and nothing is deployed.
+Pages keeps the first deploy of a commit, so a change to the site alone
+shows with the next run for a new commit.
+To look at it before a push:
+
+```bash
+site/build.sh --out /tmp/site
+```
+
 ## Cutting a release
 
 A release is a version in `CHANGELOG.md` and in
-`custom_components/massimo/manifest.json`, a signed tag `v<version>`,
-and a GitHub release made from that tag:
-HACS offers a repository's GitHub releases, not its bare tags.
-The owner cuts releases.
+`custom_components/massimo/manifest.json`, and a signed tag `v<version>`;
+CI makes the rest (above).
 
 Every command of `changelog.sh` below only says what it would do,
 until it is given `--force`.
@@ -153,13 +212,8 @@ until it is given `--force`.
    history.
    Then `changelog.sh tag X.Y.Z --push --force` publishes the tag and nothing
    else.
-4. **Make the GitHub release** from the tag, its text the release's section:
-
-   ```bash
-   gh release create vX.Y.Z --verify-tag --title "X.Y.Z" \
-     --notes "$(GUIDELINES/shared/tools/changelog.sh notes X.Y.Z)"
-   ```
-
-A version with a pre-release part, such as `0.2.0-beta.1`,
-is published with `--prerelease`;
-HACS offers it only to those who ask for pre-releases.
+4. **Approve the release.**
+   The tag's run tests against Massimo's `main` and its newest release,
+   then waits in the environment `signing` for the owner's approval;
+   approved, it makes the GitHub release, writes the `distro/*` branches
+   and deploys the site.

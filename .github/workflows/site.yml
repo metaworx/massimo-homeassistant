@@ -1,0 +1,56 @@
+# The site, https://ha.massimo.metaworx.ch (CONTRIBUTING.md, "The site"):
+# built by site/build.sh without a key and without state, from the pages of
+# site/, the README, keys/ and the distro/<channel> branches, and deployed to
+# GitHub Pages. release.yml calls it after every release run; by hand, with
+# `gh workflow run site.yml --ref main`. Pages keeps the first deploy of a
+# commit: a second run for the same commit reports success and changes
+# nothing, so a change to the site alone shows with the next commit's run.
+name: Site
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    steps:
+      # Every branch: the distro/<channel> branches the site is built from.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - name: Build the site
+        run: |
+          git fetch --quiet origin '+refs/heads/distro/*:refs/remotes/origin/distro/*'
+          site/build.sh --out _site
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  # Pages deploys from the artifact, one deploy at a time and none
+  # cancelled. The owner's settings: Pages' source is "GitHub Actions", its
+  # custom domain ha.massimo.metaworx.ch, and the github-pages environment
+  # admits the version tags beside main.
+  deploy:
+    name: Deploy the site
+    needs: build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        id: deployment

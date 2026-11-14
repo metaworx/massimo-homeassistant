@@ -1,0 +1,176 @@
+# The release of a commit CI has tested (CONTRIBUTING.md, "Releases and
+# channels"): called by ci.yml for a push of main or of a version tag once
+# every check has passed. Called, it runs with the caller's ref, which the
+# environments' rules are matched against: a version tag, which the
+# signing environment admits alone, or main, which signing-rolling admits.
+#
+# `build` holds no secret: tools/dist.py names the version and the channel
+# (a tag: its version, beta below 1.0.0 or alpha where it carries -alpha,
+# else stable; main: devel), builds the tree a distro branch holds and its
+# zip, and attests the zip's provenance (GitHub's, through Sigstore;
+# gh attestation verify massimo.zip -R <repository> checks it).
+# `sign` holds the key of its environment, SIGNING_KEY - the release key
+# in signing, the rolling key in signing-rolling - and the deploy key
+# DISTRO_DEPLOY_KEY, which the ruleset on distro/* lets through alone. It
+# signs the zip, checks the signature against keys/allowed_signers, makes
+# a tag's GitHub release (a pre-release below 1.0.0 or with a pre-release
+# part), and writes each channel the release goes to: a commit of the tree,
+# signed with the same key, on top of distro/<channel>. devel has no
+# GitHub release, and no run writes a channel that holds a newer version.
+# `site` then builds the site from the distro branches and deploys it.
+name: Release
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    outputs:
+      kind: ${{ steps.meta.outputs.kind }}
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      channel: ${{ steps.meta.outputs.channel }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+    steps:
+      # The tags, for git describe's count of a devel build.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: What to release
+        id: meta
+        run: python3 tools/dist.py meta --ref "$GITHUB_REF" --sha "$GITHUB_SHA" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Build the tree and its zip
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: python3 tools/dist.py build --version "$VERSION" --source "$GITHUB_SHA" --out dist
+
+      - name: Attest the zip's provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/massimo.zip
+
+      # .distro/ is hidden: upload-artifact leaves it out unless told.
+      - name: Hand the files to the signing job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: dist/
+          include-hidden-files: true
+          if-no-files-found: error
+
+  sign:
+    name: Sign and publish ${{ needs.build.outputs.version }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment: ${{ needs.build.outputs.kind == 'tag' && 'signing' || 'signing-rolling' }}
+    # One run at a time writes the distro branches; none is cancelled.
+    concurrency:
+      group: distro
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    env:
+      KIND: ${{ needs.build.outputs.kind }}
+      TAG: ${{ needs.build.outputs.tag }}
+      VERSION: ${{ needs.build.outputs.version }}
+      CHANNEL: ${{ needs.build.outputs.channel }}
+      PRERELEASE: ${{ needs.build.outputs.prerelease }}
+      PRINCIPAL: ${{ needs.build.outputs.kind == 'tag' && 'release@ha.massimo.metaworx.ch' || 'rolling@ha.massimo.metaworx.ch' }}
+    steps:
+      # The guidelines' submodule holds changelog.sh, for the notes.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: dist
+
+      - name: Sign the zip
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          if [ -z "$SIGNING_KEY" ]; then
+            echo "::error::SIGNING_KEY is not set in this environment: nothing is signed or published."
+            exit 1
+          fi
+          umask 077
+          key_dir="$RUNNER_TEMP/key"
+          mkdir -p "$key_dir"
+          printf '%s\n' "$SIGNING_KEY" > "$key_dir/key"
+          ssh-keygen -Y sign -q -f "$key_dir/key" -n file dist/massimo.zip
+          ssh-keygen -Y verify -f keys/allowed_signers -I "$PRINCIPAL" -n file -s dist/massimo.zip.sig < dist/massimo.zip
+          cp dist/massimo.zip.sig dist/tree/.distro/massimo.zip.sig
+          (cd dist && sha256sum -c SHA256SUMS)
+
+      - name: Make the GitHub release
+        if: env.KIND == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          GUIDELINES/shared/tools/changelog.sh notes "$VERSION" > "$RUNNER_TEMP/notes.md"
+          flags=()
+          if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
+          gh release create "$TAG" --verify-tag --title "$VERSION" --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}" \
+            dist/massimo.zip dist/massimo.zip.sig dist/SHA256SUMS
+
+      # Each channel the release goes to: its own, and each less stable one
+      # that holds an older version (tools/dist.py targets). A commit of the
+      # tree on top of the branch, signed with this environment's key,
+      # pushed with the deploy key; GitHub's host keys from its API.
+      - name: Write the distro branches
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          DEPLOY_KEY: ${{ secrets.DISTRO_DEPLOY_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$DEPLOY_KEY" ]; then
+            echo "::error::DISTRO_DEPLOY_KEY is not set in this environment: no distro branch is written."
+            exit 1
+          fi
+          umask 077
+          key_dir="$RUNNER_TEMP/key"
+          mkdir -p "$key_dir"
+          printf '%s\n' "$SIGNING_KEY" > "$key_dir/key"
+          printf '%s\n' "$DEPLOY_KEY" > "$key_dir/deploy"
+          gh api meta --jq '.ssh_keys[] | "github.com " + .' > "$key_dir/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i $key_dir/deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$key_dir/known_hosts"
+          git fetch --quiet origin '+refs/heads/distro/*:refs/remotes/origin/distro/*'
+          held=()
+          for ch in stable beta alpha; do
+            if v=$(git show "refs/remotes/origin/distro/$ch:.distro/VERSION" 2>/dev/null); then
+              held+=(--held "$ch=$v")
+            fi
+          done
+          targets=$(python3 tools/dist.py targets --version "$VERSION" --channel "$CHANNEL" "${held[@]}")
+          for ch in $targets; do
+            parent=$(git rev-parse --verify --quiet "refs/remotes/origin/distro/$ch" || true)
+            commit=$(python3 tools/dist.py commit --tree dist/tree --parent "$parent" --key "$key_dir/key" \
+              --name "Massimo for Home Assistant" --email "$PRINCIPAL" \
+              --message "massimo $VERSION on $ch, from $GITHUB_SHA")
+            git -c gpg.ssh.allowedSignersFile=keys/allowed_signers verify-commit "$commit"
+            git push "git@github.com:${GITHUB_REPOSITORY}.git" "$commit:refs/heads/distro/$ch"
+            echo "distro/$ch is $commit ($VERSION)"
+          done
+
+  site:
+    name: Site
+    needs: sign
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/site.yml
