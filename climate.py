@@ -156,6 +156,11 @@ class RoomClimate(RoomEntity, ClimateEntity, RestoreEntity):
     _restored_changed: str | None = None
 
     _attr_name = None
+    # Home Assistant 2026.11 names the temperatures native_*, and warns of an
+    # entity giving the old names alone, which stop working in 2027.11;
+    # 2026.10 reads the old names only. Given both, 2026.11 takes the
+    # native ones without a warning.
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_target_temperature_step = STEP
     _attr_hvac_modes = [HVACMode.AUTO, HVACMode.HEAT, HVACMode.OFF]
@@ -178,15 +183,19 @@ class RoomClimate(RoomEntity, ClimateEntity, RestoreEntity):
 
     @property
     @override
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         """The room's temperature, as Massimo computes it."""
         return self.state_data.get("actual_temp")
 
     @property
     @override
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         """The setpoint the room's thermostats hold."""
         return self._setpoint
+
+    # The names Home Assistant 2026.10 reads.
+    current_temperature = native_current_temperature
+    target_temperature = native_target_temperature
 
     @property
     @override
