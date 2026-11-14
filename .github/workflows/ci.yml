@@ -113,6 +113,8 @@ jobs:
         run: MASSIMO_BIN="$RUNNER_TEMP/massimo" python -m pytest -v -rs
 
   # A push of main or of a version tag, every check passed: released.
+  # secrets: inherit, or the called workflow sees no secret, not even its
+  # environment's.
   release:
     name: Release
     needs: [hassfest, hacs, lint, test]
@@ -123,3 +125,4 @@ jobs:
       attestations: write
       pages: write
     uses: ./.github/workflows/release.yml
+    secrets: inherit
