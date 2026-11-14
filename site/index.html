@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Massimo for Home Assistant</title>
+<meta name="description" content="A Home Assistant integration for Massimo, the server for eQ-3 MAX! Cubes: rooms, devices, week programmes.">
+<!-- The site's home (CONTRIBUTING.md, "The site"): site/build.sh puts the
+     channels it finds in place of the placeholder below. Links are
+     absolute, so that they hold wherever the page is shown. -->
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<header>
+<h1>Massimo for Home Assistant</h1>
+<p>A Home Assistant integration for <a href="https://massimo.metaworx.ch/">Massimo</a>, the server that holds eQ-3 MAX! Cubes: their devices, each room's heating with boost and vacation, and a card that edits a room's week programme with Massimo's own editor.</p>
+</header>
+<main>
+<p>Massimo keeps the Cubes, their radio budget, pairing and week programmes; Home Assistant becomes one more client of its HTTP API, signed in with an API key of the role <code>integration</code>. It needs Home Assistant 2026.10 or newer and a Massimo server that lists <code>vwt</code> among its <code>features</code>. What it does: <a href="/readme.html">the README</a>.</p>
+
+<h2 id="channels">Channels</h2>
+<p>Every version below 1.0.0 is a pre-release: on the channel <code>beta</code>, or <code>alpha</code> where it carries <code>-alpha</code>. A channel also takes every release of a more stable one that is newer than what it holds. <code>devel</code> is <code>main</code> once its tests have passed, and has no release of its own.</p>
+{{CHANNELS}}
+
+<h2 id="git">Install with git</h2>
+<p>Each channel is a branch, <code>distro/&lt;channel&gt;</code>, whose root is the integration's folder. In Home Assistant's configuration folder:</p>
+<pre><code>git clone -b distro/beta https://github.com/metaworx/massimo-homeassistant.git custom_components/massimo
+</code></pre>
+<p>Then restart Home Assistant and add the integration under Settings → Devices &amp; services. <code>git -C custom_components/massimo pull</code> and a restart install the channel's next version.</p>
+
+<h2 id="zip">Install a zip</h2>
+<p>Each channel's newest version is also a zip, <code>/distro/&lt;channel&gt;.zip</code> above, with its signature. Unpack it into <code>custom_components/massimo</code> in Home Assistant's configuration folder, then restart Home Assistant. A tagged release carries the same zip on the <a href="https://github.com/metaworx/massimo-homeassistant/releases">releases page</a>.</p>
+
+<h2 id="verify">Check what you install</h2>
+<p>Two keys sign: the release key every tagged release and the branches <code>distro/stable</code>, <code>beta</code> and <code>alpha</code>, the rolling key <code>distro/devel</code>. Both are in <a href="/keys/allowed_signers"><code>allowed_signers</code></a>, which the repository carries as <code>keys/allowed_signers</code>. A zip:</p>
+<pre><code>ssh-keygen -Y verify -f allowed_signers -I release@ha.massimo.metaworx.ch -n file -s beta.zip.sig &lt; beta.zip
+</code></pre>
+<p>(<code>rolling@ha.massimo.metaworx.ch</code> for devel.) A branch, in the clone:</p>
+<pre><code>git -c gpg.ssh.allowedSignersFile=/path/to/allowed_signers verify-commit HEAD
+</code></pre>
+<p>A key is only as trustworthy as the place it came from: take <code>allowed_signers</code> from the repository on GitHub, not from a copy elsewhere. Every tagged release's zip also carries GitHub's build provenance: <code>gh attestation verify massimo.zip -R metaworx/massimo-homeassistant</code>.</p>
+
+<h2 id="marketplace">Home Assistant's Marketplace and HACS</h2>
+<p>Once released, the integration is installed from the Marketplace (Home Assistant 2026.11) or HACS (2026.10) by adding this repository by its link. Below 1.0.0 every release is a pre-release: turn on <strong>Pre-release</strong> for it, or the Marketplace installs the newest commit of <code>main</code>, which no test has to have passed.</p>
+</main>
+<footer>
+<p><a href="/privacy.html">Privacy policy</a> · <a href="https://github.com/metaworx/massimo-homeassistant">Source on GitHub</a> · <a href="https://github.com/metaworx/massimo-homeassistant/issues">Questions and bugs</a> · Free software under the <a href="https://github.com/metaworx/massimo-homeassistant/blob/main/LICENSE">Apache-2.0</a> · <a href="https://massimo.metaworx.ch/">Massimo</a></p>
+<p>&quot;MAX!&quot; and &quot;eQ-3&quot; are trademarks of eQ-3 AG.
+This project is not affiliated with or endorsed by eQ-3.</p>
+</footer>
+</body>
+</html>

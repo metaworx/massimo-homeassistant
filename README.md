@@ -107,9 +107,20 @@ beside Massimo's own web UI and apps.
    or on the server `massimo user add homeassistant -role integration`.
    The role reads, sets temperatures, locks and configures (week programmes,
    temperatures, device settings), and nothing else.
-2. Copy `custom_components/massimo` into Home Assistant's
-   `custom_components` directory and restart Home Assistant.
-   (Through HACS or the Marketplace once released.)
+2. Install it into Home Assistant's `custom_components/massimo` from the
+   channel you choose, with git or as a signed zip, as
+   <https://ha.massimo.metaworx.ch> shows:
+
+   ```bash
+   git clone -b distro/beta https://github.com/metaworx/massimo-homeassistant.git custom_components/massimo
+   ```
+
+   and restart Home Assistant.
+   `distro/<channel>` is `stable`, `beta`, `alpha` or `devel`;
+   every version below 1.0.0 is `beta`, or `alpha` where it carries
+   `-alpha`, and `devel` is `main` once its tests have passed;
+   until the first release, `devel` is the only one.
+   (Through the Marketplace or HACS once released.)
 3. Settings → Devices & services → Add integration → **Massimo**:
    the address at which a browser opens Massimo's web UI, and the key.
 

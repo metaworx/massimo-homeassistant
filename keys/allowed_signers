@@ -1,0 +1,6 @@
+# The keys that sign Massimo for Home Assistant (CONTRIBUTING.md, "Releases and channels"):
+# the release key every tagged release and distro/stable, beta and alpha; the rolling key distro/devel.
+# ssh-keygen -Y verify -f keys/allowed_signers -I <principal> -n file -s <zip>.sig < <zip>
+# git -c gpg.ssh.allowedSignersFile=keys/allowed_signers verify-commit <commit>
+release@ha.massimo.metaworx.ch namespaces="git,file" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHdTBBg27P7FmzEPK2om2udzIc6A2VxQ6QDk8SsxDUsy
+rolling@ha.massimo.metaworx.ch namespaces="git,file" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKtXa36VG1epaczdiV4vAPBi4MuzR7XBoucTr8LW9DJR
