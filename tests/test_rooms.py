@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import pytest
 from homeassistant.components.climate import HVACAction, HVACMode
+from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import area_registry as ar
@@ -17,7 +18,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from custom_components.massimo.api import MassimoClient
-from custom_components.massimo.climate import vacation_until
+from custom_components.massimo.climate import RoomClimate, vacation_until
 from custom_components.massimo.const import DOMAIN
 
 from .conftest import Server, http, rooms
@@ -165,6 +166,29 @@ def test_a_vacation_ends_on_the_half_hour() -> None:
     assert vacation_until(at.replace(minute=1), now) == at.strftime("%Y-%m-%d 14:30")
     assert vacation_until(at.replace(minute=30), now) == at.strftime("%Y-%m-%d 14:30")
     assert vacation_until(at.replace(minute=31), now) == at.strftime("%Y-%m-%d 15:00")
+
+
+def test_the_temperatures_by_both_names() -> None:
+    """Home Assistant 2026.11 names climate's temperatures native_* and
+    warns of an entity that gives an old name alone (it stops working in
+    2027.11); 2026.10 reads the old names. A room gives each by both names,
+    the same value, so that 2026.11 takes the native one without a warning.
+    """
+    names = {
+        "_attr_temperature_unit": "_attr_native_temperature_unit",
+        "current_temperature": "native_current_temperature",
+        "target_temperature": "native_target_temperature",
+    }
+    own = vars(RoomClimate)
+    for old, native in names.items():
+        assert old in own and native in own, (old, native)
+    assert own["current_temperature"] is own["native_current_temperature"]
+    assert own["target_temperature"] is own["native_target_temperature"]
+    # Home Assistant makes an _attr_ class attribute a property; an instance
+    # reads its value.
+    room = RoomClimate.__new__(RoomClimate)
+    assert room._attr_temperature_unit == room._attr_native_temperature_unit == UnitOfTemperature.CELSIUS
+    assert not {"temperature_unit", "target_temperature_high", "target_temperature_low"} & own.keys()
 
 
 async def test_the_temperature_method(hass: HomeAssistant, massimo_server: Server, socket_enabled: None) -> None:
