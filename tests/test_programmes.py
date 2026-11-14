@@ -7,8 +7,10 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.core import Context, HomeAssistant
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError, Unauthorized
+from pytest_homeassistant_custom_component.common import MockUser
+from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.massimo.const import DOMAIN
 from custom_components.massimo.program import DAYS
@@ -115,6 +117,64 @@ async def test_copy_a_room_and_a_day(hass: HomeAssistant, rooms_kept: dict) -> N
     with pytest.raises(ServiceValidationError) as refused:
         await hass.services.async_call(DOMAIN, "copy_program", {"entity_id": schlafen}, blocking=True)
     assert refused.value.translation_key == "program_copy_nothing"
+
+
+async def test_a_viewer_reads_a_programme(
+    hass: HomeAssistant, rooms_kept: dict, hass_ws_client: WebSocketGenerator, hass_read_only_access_token: str
+) -> None:
+    """A user who may only view reads a room's programme as the card calls
+    it, and may not write it."""
+    room = rooms_kept["schlafen"]
+    ws = await hass_ws_client(hass, hass_read_only_access_token)
+
+    async def call(service: str, data: dict[str, Any]) -> dict[str, Any]:
+        await ws.send_json_auto_id(
+            {
+                "type": "call_service",
+                "domain": DOMAIN,
+                "service": service,
+                "service_data": data,
+                "target": {"entity_id": room},
+                "return_response": True,
+            }
+        )
+        return await ws.receive_json()
+
+    read = await call("get_program", {})
+    assert read["success"], read
+    assert set(read["result"]["response"][room]["program"]) == set(DAYS)
+    written = await call("set_program", {"program": {"monday": DAY}})
+    assert not written["success"]
+    assert written["error"]["message"] == "Unauthorized", written
+
+
+async def test_reading_needs_view(hass: HomeAssistant, rooms_kept: dict, hass_read_only_user: MockUser) -> None:
+    """A user who may not view a room is refused its programme, and a copy
+    from it; all rooms means those the user may view."""
+    wohnen, schlafen = rooms_kept["wohnen"], rooms_kept["schlafen"]
+    hass_read_only_user.mock_policy({"entities": {"entity_ids": {wohnen: True}}})
+    context = Context(user_id=hass_read_only_user.id)
+    with pytest.raises(Unauthorized):
+        await hass.services.async_call(
+            DOMAIN, "get_program", {"entity_id": schlafen}, blocking=True, return_response=True, context=context
+        )
+    answer = await hass.services.async_call(
+        DOMAIN, "get_program", {"entity_id": "all"}, blocking=True, return_response=True, context=context
+    )
+    assert list(answer) == [wohnen]
+    with pytest.raises(Unauthorized):
+        await hass.services.async_call(
+            DOMAIN, "copy_program", {"entity_id": wohnen, "source": schlafen}, blocking=True, context=context
+        )
+
+
+async def test_get_program_is_for_rooms(hass: HomeAssistant, rooms_kept: dict) -> None:
+    """An entity that is not a Massimo room is refused, saying which."""
+    with pytest.raises(ServiceValidationError) as refused:
+        await hass.services.async_call(
+            DOMAIN, "get_program", {"entity_id": "climate.elsewhere"}, blocking=True, return_response=True
+        )
+    assert refused.value.translation_key == "not_a_room"
 
 
 async def test_program_changed_outlasts_a_reload(

@@ -142,6 +142,9 @@
     "program_changed_meanwhile": {
       "message": "The week programme changed since it was read, in another client, at a thermostat, or by a write still on its way. Read it again, then write."
     },
+    "not_a_room": {
+      "message": "{entity_id} is not a Massimo room."
+    },
     "program_source": {
       "message": "{source} is not a Massimo room."
     },
