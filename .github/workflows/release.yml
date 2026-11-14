@@ -12,7 +12,8 @@
 # `sign` holds the key of its environment, SIGNING_KEY - the release key
 # in signing, the rolling key in signing-rolling - and the deploy key
 # DISTRO_DEPLOY_KEY, which the ruleset on distro/* lets through alone. It
-# signs the zip, checks the signature against keys/allowed_signers, makes
+# signs the zip and SHA256SUMS, checks both signatures against
+# keys/allowed_signers, makes
 # a tag's GitHub release (a pre-release below 1.0.0 or with a pre-release
 # part), and writes each channel the release goes to: a commit of the tree,
 # signed with the same key, on top of distro/<channel>. devel has no
@@ -99,7 +100,9 @@ jobs:
           name: release
           path: dist
 
-      - name: Sign the zip
+      # The zip's signature travels with it into the distro branches;
+      # SHA256SUMS's covers every file a release carries, as one check.
+      - name: Sign the zip and SHA256SUMS
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
@@ -111,8 +114,10 @@ jobs:
           key_dir="$RUNNER_TEMP/key"
           mkdir -p "$key_dir"
           printf '%s\n' "$SIGNING_KEY" > "$key_dir/key"
-          ssh-keygen -Y sign -q -f "$key_dir/key" -n file dist/massimo.zip
-          ssh-keygen -Y verify -f keys/allowed_signers -I "$PRINCIPAL" -n file -s dist/massimo.zip.sig < dist/massimo.zip
+          for f in dist/massimo.zip dist/SHA256SUMS; do
+            ssh-keygen -Y sign -q -f "$key_dir/key" -n file "$f"
+            ssh-keygen -Y verify -f keys/allowed_signers -I "$PRINCIPAL" -n file -s "$f.sig" < "$f"
+          done
           cp dist/massimo.zip.sig dist/tree/.distro/massimo.zip.sig
           (cd dist && sha256sum -c SHA256SUMS)
 
@@ -125,7 +130,7 @@ jobs:
           flags=()
           if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
           gh release create "$TAG" --verify-tag --title "$VERSION" --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}" \
-            dist/massimo.zip dist/massimo.zip.sig dist/SHA256SUMS
+            dist/massimo.zip dist/massimo.zip.sig dist/SHA256SUMS dist/SHA256SUMS.sig
 
       # Each channel the release goes to: its own, and each less stable one
       # that holds an older version (tools/dist.py targets). A commit of the

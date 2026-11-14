@@ -35,7 +35,7 @@
 <p>Two keys sign: the release key every tagged release and the branches <code>distro/stable</code>, <code>beta</code> and <code>alpha</code>, the rolling key <code>distro/devel</code>. Both are in <a href="/keys/allowed_signers"><code>allowed_signers</code></a>, which the repository carries as <code>keys/allowed_signers</code>. A zip:</p>
 <pre><code>ssh-keygen -Y verify -f allowed_signers -I release@ha.massimo.metaworx.ch -n file -s beta.zip.sig &lt; beta.zip
 </code></pre>
-<p>(<code>rolling@ha.massimo.metaworx.ch</code> for devel.) A branch, in the clone:</p>
+<p>(<code>rolling@ha.massimo.metaworx.ch</code> for devel.) A tagged release's files, all at once: check <code>SHA256SUMS</code> against <code>SHA256SUMS.sig</code> in the same way, then <code>sha256sum -c SHA256SUMS</code>. A branch, in the clone:</p>
 <pre><code>git -c gpg.ssh.allowedSignersFile=/path/to/allowed_signers verify-commit HEAD
 </code></pre>
 <p>A key is only as trustworthy as the place it came from: take <code>allowed_signers</code> from the repository on GitHub, not from a copy elsewhere. Every tagged release's zip also carries GitHub's build provenance: <code>gh attestation verify massimo.zip -R metaworx/massimo-homeassistant</code>.</p>

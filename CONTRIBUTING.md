@@ -142,8 +142,9 @@ A branch's root is the integration's folder, with its version in
 `manifest.json`, `LICENSE`, and `.distro/` (`VERSION`, `SOURCE`, and the
 zip's signature `massimo.zip.sig`);
 each commit is on top of the last, so a clone follows it with `git pull`.
-A tag's GitHub release carries the same tree as `massimo.zip`, its signature
-and `SHA256SUMS`; `devel` has no GitHub release, since HACS offers every
+A tag's GitHub release carries the same tree as `massimo.zip`, its signature,
+and `SHA256SUMS` with its own signature, one check for every file the
+release carries; `devel` has no GitHub release, since HACS offers every
 release it finds.
 
 **Keys.**
