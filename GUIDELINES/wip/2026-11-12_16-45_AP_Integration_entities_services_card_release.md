@@ -1,4 +1,4 @@
-# AP Integration v1.6: Entities, services, card, release
+# AP Integration v1.7: Entities, services, card, release
 
 ## TL;DR
 
@@ -8,6 +8,11 @@ and replaces `maxcube` on breno.
 Each block requires the Massimo feature it uses, by name, from `/healthz`.
 
 - devices, rooms, boost, programmes, brand images, card → done (1-7)
+- read access → `get_program` needs `control` (an entity service) →
+  a service of the integration checking `read`: a view-only user reads
+  the programme, the card included; `copy_program` reads its source only
+  where the user may
+- users to Massimo → not here: waits for Massimo's `integration` feature
 - distribution → a GitHub release by hand → CI: signed zip, SSH-signed
   `distro/<channel>` branches for git, the zips on `ha.massimo.metaworx.ch`
 - channels: stable; beta (every 0.x, and `-beta`); alpha (`-alpha`);
@@ -27,9 +32,10 @@ Each block requires the Massimo feature it uses, by name, from `/healthz`.
 6. Brand images - done
 7. Card - done
 8. Distribution: `dist.py`, the release workflow, `distro/*`, keys, site
-9. Breno trial: the integration from `distro/devel` on the Pi
-10. First release: 0.1.0, category, topics, the zip for HACS
-11. Breno: `maxcube` removed, the box's documentation
+9. Read access: `get_program` for a view-only user, `copy_program`'s source
+10. Breno trial: the integration from `distro/devel` on the Pi
+11. First release: 0.1.0, category, topics, the zip for HACS
+12. Breno: `maxcube` removed, the box's documentation
 
 ## Discussion
 
@@ -131,7 +137,7 @@ Apache-2.0; the repository is public.
   after fetching `main` and building on the plan there.
 - **D32-A.** `categories: ["climate.thermostats_heating"]`.
 - **D33-A.** Before the release, a check on Home Assistant 2026.11:
-  the breno trial (Block 9) is that check, the Pi running 2026.11.0;
+  the breno trial (Block 10) is that check, the Pi running 2026.11.0;
   the tests on 2026.11 once the harness has a version for it.
 - **D34-A.** The first version is 0.1.0; its cut ends D14's
   "bump without a cut".
@@ -157,8 +163,8 @@ Apache-2.0; the repository is public.
 - **D46** (the owner, 2026-11-14).
   The keys are made in `~/.ssh` by this session, never shown, piped straight
   into `gh secret set`, and kept in `~/.ssh`.
-- **D47-A.** Order: distribution (8), the breno trial (9), the first
-  release (10), `maxcube` removed (11).
+- **D47-A.** Order: distribution (8), the breno trial (10), the first
+  release (11), `maxcube` removed (12); read access (9) added by D56.
 - **D48-A.** The channels' zips on this repository's Pages, not as
   releases: any release is one HACS may offer.
 - **D49-A.** The `distro/*` commits are signed, the release key for
@@ -170,6 +176,27 @@ Apache-2.0; the repository is public.
   for both checks.
 - **D52-A.** Massimo's site files are copied here under Apache-2.0,
   as the owner, holder of both licences, allows.
+- **D53-A** (the owner, 2026-11-14).
+  Reading a programme needs view, writing it control:
+  `massimo.get_program` is a service of the integration that checks `read`
+  on each room it names, as Home Assistant checks `control` on an entity
+  service; its name, target and answer stay as they are.
+  `set_program`, `copy_program` and `set_vacation` stay entity services,
+  needing `control`.
+- **D54-A.** `copy_program` also needs `read` on the room it copies from.
+- **D55-B** (the owner, 2026-11-14), for the plan that passes users on:
+  a call without a user (an automation, a script, the system) names the
+  fixed user `system`.
+- **D56** (the owner, 2026-11-14).
+  Read access is Block 9, after Block 8 of v1.6; the trial, the release and
+  breno move down to 10 to 12.
+  Passing the Home Assistant user on to Massimo - its id and name, and the
+  call's access level, `admin`, `control` or `view` for the call's target -
+  is not this plan's: it waits for Massimo's `integration` feature on
+  Massimo's `main`, and is built as Massimo specifies it, under a plan of
+  its own.
+- **D57-B** (the owner, 2026-11-14).
+  Nothing is asked of Massimo for it yet.
 - **Areas.**
   Every device suggests its room's name as its area, once;
   the areas stay the owner's.
@@ -279,6 +306,20 @@ Home Assistant 2026.10 loads a script on every page with
   git there; Massimo `v0.15.0-alpha.1-153-g1b3a9a1` as a service, with
   `features`; `maxcube` failed its setup on 2026-11-12 (the proxy refused)
   and has not run since.
+
+**Permissions** (Home Assistant 2026.10, its `helpers/service.py` and
+`auth/permissions`):
+a user is an administrator or not; the groups are fixed
+(`system-admin`, `system-users`, `system-read-only`), and their policies
+grant `read`, `control` or `edit` per entity, without a UI.
+An entity service needs `control` on each entity a non-admin names,
+whatever it does, and offers nothing else;
+a service of the integration checks what it needs itself, from
+`call.context.user_id`, and a call without one is the system's.
+The WebSocket's `call_service` merges its `target` into the call's data,
+so the card's call reaches either kind unchanged.
+The context of a call is set on the entity before the service runs,
+so a write can tell whose it is: the later plan's starting point.
 
 **Tests** run on Massimo's fixture `rooms`:
 room 1 "Wohnen", a wall thermostat at 21.4 °C and two radiator thermostats;
@@ -487,7 +528,30 @@ hand; `site/build.sh` and `dist.py` run locally against a local
 `distro/*`; a signature made and checked with a throw-away key.
 The workflows run first when the branch is pushed and merged.
 
-### Block 9: Breno trial
+### Block 9: Read access
+
+1. `massimo.get_program` registered by the integration (D53-A), no longer
+   by the `climate` platform: the same name, a `target` of room `climate`s,
+   `SupportsResponse.ONLY`, the answer `{entity_id: {...}}` as before.
+   A non-admin caller needs `read` on each entity named, else
+   `Unauthorized`; a call without a user goes through.
+   An entity that is not a room's `climate` of this integration is refused,
+   translated.
+2. `massimo.copy_program` checks `read` on its `source` for a non-admin
+   caller (D54-A); `control` on its target stays Home Assistant's check.
+3. `services.yaml` unchanged in what it offers; the refusal's text in
+   `en.json`, `de.json` and `strings.json`.
+4. **Tests**, against the fake Cube: a read-only user reads a programme
+   through the WebSocket's `call_service` as the card calls it, and is
+   refused `set_program`; a user who may not read a room is refused
+   `get_program` and a `copy_program` from it; a call without a user and an
+   admin's read as before.
+5. **CHANGELOG fragment** under `Added`.
+
+**Verification:**
+the test gate, ruff, hassfest.
+
+### Block 10: Breno trial
 
 1. As `pi` on `pi.breno.caleon.ch` (D38): `distro/devel` cloned into
    `/srv/homeassistant/config/custom_components/massimo`, its commit's
@@ -497,13 +561,13 @@ The workflows run first when the branch is pushed and merged.
 3. Checked: the Cube, the devices, the rooms and their `climate`s,
    a setpoint from Home Assistant seen in Massimo's log, the card on a
    dashboard.
-   `maxcube`'s YAML stays as it is (Block 11).
+   `maxcube`'s YAML stays as it is (Block 12).
 4. A NOTE: how it went, Home Assistant 2026.11 included (D33-A).
 
 **Verification:**
 as step 3.
 
-### Block 10: First release
+### Block 11: First release
 
 1. `manifest.json` `categories` (D32-A); `hacs.json` with
    `zip_release` and `filename: massimo.zip`;
@@ -519,29 +583,44 @@ as step 3.
 **Verification:**
 CI's release run; the zip installed through HACS on a scratch 2026.10.
 
-### Block 11: Breno
+### Block 12: Breno
 
 On the owner's word: the `maxcube` YAML removed from
 `configuration.yaml`, the box's documentation updated.
 
 **Verification:**
-Home Assistant starts without `maxcube`; the rooms as in Block 9.
+Home Assistant starts without `maxcube`; the rooms as in Block 10.
 
 ## Proposed commit message
 
-For the revision, committed on its own before Block 8:
+For the revision, committed on its own before Block 9:
 
 ```
-chore(aps): +Integration v1.6
+chore(aps): +Integration v1.7
 
-Distribution before the first release: signed zips and distro branches by CI, a site of the integration's own, then the breno trial, the release, and maxcube's removal.
+A view-only user reads a room's week programme: read access becomes Block 9, before the trial and the release.
 
 Key changes:
-- Block 7 done (#8); Blocks 8 to 11: distribution, the breno trial, the first release, breno
-- D32 to D36, D42, D47 to D49, D51, D52 as recommended; D38, D45, D46, D50 as the owner gave them
-- Analysis: how HACS picks a release, Pages, rulesets, the Pi
+- Block 9: get_program a service of the integration that checks read; copy_program checks read on its source
+- Blocks 9 to 11 of v1.6 move to 10 to 12
+- D53, D54 as recommended; D55-B, D56, D57-B as the owner gave them: passing users on to Massimo waits for its integration feature
 
-File-revision-v1: GUIDELINES/wip/2026-11-12_16-45_AP_Integration_entities_services_card_release.md::v1.6::2026-11-14::TL;DR, Discussion, Analysis, Implementation Plan, Proposed commit message, Change History::distribution and the breno trial before the release; D32 to D52
+File-revision-v1: GUIDELINES/wip/2026-11-12_16-45_AP_Integration_entities_services_card_release.md::v1.7::2026-11-14::TL;DR, Discussion, Analysis, Implementation Plan, Proposed commit message, Change History::read access as Block 9; D53 to D57
+Assisted-by: claude-code:claude-opus-5-5
+```
+
+For Block 9:
+
+```
+fix(integration): A view-only user reads a room's week programme
+
+massimo.get_program needed control, as every entity service does, so a user who may only view a room could not open its programme, nor use the card. It is now a service of the integration that checks read on each room it names; copy_program also checks read on the room it copies from.
+
+Key changes:
+- get_program registered by the integration, its name, target and answer as before
+- copy_program refuses a source the user may not read
+- tests with a read-only user and a user without read on a room
+
 Assisted-by: claude-code:claude-opus-5-5
 ```
 
@@ -594,3 +673,11 @@ Assisted-by: claude-code:claude-opus-5-5
   The breno trial from `distro/devel` before the release (D38), the release
   after Massimo's next tagged release; `maxcube` removed last.
   D32 to D36 as recommended; the analysis of HACS, Pages and the Pi.
+- v1.7 (2026-11-14): read access, Block 9 (D53-A, D54-A):
+  `get_program` for a view-only user, `copy_program`'s source read only
+  where the user may.
+  The trial, the release and breno move to Blocks 10 to 12 (D56), their
+  references in D33-A and D47-A with them.
+  Passing users on to Massimo left to a plan of its own, after Massimo's
+  `integration` feature (D55-B, D56, D57-B).
+  Written on the unpushed v1.6 at the owner's word, not on `main` (D31-A).
