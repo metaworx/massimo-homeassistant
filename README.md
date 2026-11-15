@@ -20,7 +20,13 @@ beside Massimo's own web UI and apps.
 
 - **Setup** by address, or found by mDNS (`_massimo._tcp`),
   registered by a code that Massimo's owner approves, or with an API key.
-  The server is known by its node id, so a new address is followed.
+  The server is known by its node id; an address found again on the
+  network replaces one found before, never one you typed, except that a
+  registered entry follows the address Massimo announces.
+- **The server as a device**, the Cubes beneath it: Massimo's version, its
+  address to visit, and diagnostic entities - *Connected*, *Last contact*
+  (off by default) and *Signed in as* (registered, a person's key, or a
+  server without users) - and diagnostics to download, without the key.
 - **Users**: registered, each call names the Home Assistant user it is made
   for, and Massimo allows it what that user may do ("Users", below).
 - **Live data**:
@@ -122,16 +128,28 @@ beside Massimo's own web UI and apps.
    (Through the Marketplace or HACS once released.)
 2. Settings → Devices & services → Add integration → **Massimo**,
    or the server Home Assistant found on the network:
-   the address at which a browser opens Massimo's web UI, then one of
-   - **Register**: Home Assistant asks Massimo to register it and shows a code.
+   the address at which a browser opens Massimo's web UI
+   (filled in where Home Assistant found a server not set up yet),
+   then one of
+   - **Register**: first two names, the one Home Assistant goes by in
+     Massimo's list of integrations (Home Assistant's own, by default) and
+     this server's in Home Assistant ("Massimo" and its location or host);
+     then Home Assistant asks Massimo to register it and shows a code.
      In Massimo, System settings → Integrations lists the request with its code;
      approve it there if the codes are the same, with the most it may do.
      Home Assistant collects its key and goes on by itself.
      A request waits ten minutes.
-   - **Type an API key** of a Massimo user who may read:
+   - **Type an API key** of a Massimo user who may read, and this
+     server's name in Home Assistant:
      the way to a Massimo without the feature `integration`,
      or one that takes no requests.
      A server without users needs none.
+
+   The entry's title is the name, followed by whose key it signs in with
+   where that is a person's, such as "Massimo Keller (key of anna)";
+   a title you rename yourself stays.
+   A server found on the network long ago is asked again when you open its
+   card, so the choice offered is the one it allows now.
 
 Home Assistant 2026.10 or newer.
 
