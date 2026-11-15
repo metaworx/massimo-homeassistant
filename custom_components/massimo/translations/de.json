@@ -7,46 +7,62 @@
         "description": "Der Massimo-Server, der Ihre MAX! Cubes hält.",
         "data": {
           "url": "URL",
-          "api_key": "API-Schlüssel",
           "verify_ssl": "Zertifikat prüfen"
         },
         "data_description": {
           "url": "Die Adresse, unter der ein Browser die Weboberfläche von Massimo öffnet, mit Schema und Port",
-          "api_key": "Ein API-Schlüssel eines Massimo-Benutzers mit der Rolle integration (Systemeinstellungen → Benutzer); leer für einen Server ohne Benutzer",
           "verify_ssl": "Nur aus für einen Server mit selbst erstelltem Zertifikat"
         }
       },
-      "zeroconf_confirm": {
+      "reconfigure": {
         "title": "Massimo",
-        "description": "Massimo {name} wurde unter {url} gefunden. Geben Sie einen API-Schlüssel an, um es einzurichten.",
+        "description": "Die Adresse dieses Massimo-Servers; danach, wie sich Home Assistant bei ihm anmeldet.",
         "data": {
-          "api_key": "API-Schlüssel"
+          "url": "URL",
+          "verify_ssl": "Zertifikat prüfen"
         },
         "data_description": {
-          "api_key": "Ein API-Schlüssel eines Massimo-Benutzers mit der Rolle integration (Systemeinstellungen → Benutzer); leer für einen Server ohne Benutzer"
+          "url": "Die Adresse, unter der ein Browser die Weboberfläche von Massimo öffnet, mit Schema und Port",
+          "verify_ssl": "Nur aus für einen Server mit selbst erstelltem Zertifikat"
         }
       },
-      "reauth_confirm": {
+      "sign_in": {
         "title": "Massimo",
-        "description": "Der API-Schlüssel für {url} gilt nicht mehr. Geben Sie einen neuen an.",
+        "description": "Wie sich Home Assistant bei Massimo {name} unter {url} anmeldet.",
+        "menu_options": {
+          "register": "Mit einem Code registrieren, in Massimo bestätigt",
+          "api_key": "Einen API-Schlüssel eingeben"
+        }
+      },
+      "api_key": {
+        "title": "Massimo",
+        "description": "Ein API-Schlüssel für Massimo {name} unter {url}.",
         "data": {
           "api_key": "API-Schlüssel"
         },
         "data_description": {
-          "api_key": "Ein API-Schlüssel eines Massimo-Benutzers mit der Rolle integration (Systemeinstellungen → Benutzer); leer für einen Server ohne Benutzer"
+          "api_key": "Ein API-Schlüssel eines Massimo-Benutzers, der lesen darf (Persönliche Einstellungen → API-Schlüssel); leer für einen Server ohne Benutzer"
         }
       }
+    },
+    "progress": {
+      "register": "Massimo {name} führt diese Anfrage nun unter Systemeinstellungen → Integrationen, mit dem Code **{code}**. Bestätigen Sie sie dort, wenn die Codes gleich sind; Home Assistant fährt danach von selbst fort."
     },
     "error": {
       "cannot_connect": "Der Server ist nicht erreichbar.",
       "invalid_auth": "Der API-Schlüssel ist falsch, widerrufen oder darf nicht lesen.",
+      "registration_off": "Dieser Server nimmt jetzt keine Registrierungsanfragen an (Systemeinstellungen → Integrationen), oder es kamen zu viele; geben Sie einen API-Schlüssel ein oder versuchen Sie es später.",
       "unknown": "Der Server hat unerwartet geantwortet."
     },
     "abort": {
       "already_configured": "Dieser Server ist bereits eingerichtet.",
+      "cannot_connect": "Der Server ist nicht erreichbar.",
       "not_massimo": "Das ist kein Massimo-Server.",
-      "wrong_server": "Der Schlüssel gehört zu einem anderen Server.",
-      "reauth_successful": "Der neue API-Schlüssel funktioniert."
+      "wrong_server": "Das ist ein anderer Massimo-Server als der dieses Eintrags.",
+      "registration_gone": "Die Anfrage wurde abgelehnt oder ist abgelaufen, bevor sie bestätigt wurde.",
+      "registration_failed": "Der Schlüssel der bestätigten Anfrage konnte nicht abgeholt werden; versuchen Sie es erneut.",
+      "reauth_successful": "Home Assistant meldet sich wieder bei Massimo an.",
+      "reconfigure_successful": "Der Eintrag ist geändert."
     }
   },
   "entity": {

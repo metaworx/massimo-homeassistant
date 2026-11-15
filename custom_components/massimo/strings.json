@@ -7,46 +7,62 @@
         "description": "The Massimo server that holds your MAX! Cubes.",
         "data": {
           "url": "URL",
-          "api_key": "API key",
           "verify_ssl": "Verify the certificate"
         },
         "data_description": {
           "url": "The address at which a browser opens Massimo's web UI, with its scheme and port",
-          "api_key": "An API key of a Massimo user with the role integration (System settings → Users); empty for a server without users",
           "verify_ssl": "Off only for a server whose certificate it made itself"
         }
       },
-      "zeroconf_confirm": {
+      "reconfigure": {
         "title": "Massimo",
-        "description": "Massimo {name} was found at {url}. Give it an API key to set it up.",
+        "description": "The address of this Massimo server; next, how Home Assistant signs in to it.",
         "data": {
-          "api_key": "API key"
+          "url": "URL",
+          "verify_ssl": "Verify the certificate"
         },
         "data_description": {
-          "api_key": "An API key of a Massimo user with the role integration (System settings → Users); empty for a server without users"
+          "url": "The address at which a browser opens Massimo's web UI, with its scheme and port",
+          "verify_ssl": "Off only for a server whose certificate it made itself"
         }
       },
-      "reauth_confirm": {
+      "sign_in": {
         "title": "Massimo",
-        "description": "The API key for {url} no longer works. Give a new one.",
+        "description": "How Home Assistant signs in to Massimo {name} at {url}.",
+        "menu_options": {
+          "register": "Register with a code, approved in Massimo",
+          "api_key": "Type an API key"
+        }
+      },
+      "api_key": {
+        "title": "Massimo",
+        "description": "An API key for Massimo {name} at {url}.",
         "data": {
           "api_key": "API key"
         },
         "data_description": {
-          "api_key": "An API key of a Massimo user with the role integration (System settings → Users); empty for a server without users"
+          "api_key": "An API key of a Massimo user who may read (personal settings → API keys); empty for a server without users"
         }
       }
+    },
+    "progress": {
+      "register": "Massimo {name} now lists this request under System settings → Integrations, with the code **{code}**. Approve it there if the codes are the same; Home Assistant goes on by itself once you have."
     },
     "error": {
       "cannot_connect": "The server cannot be reached.",
       "invalid_auth": "The API key is wrong, revoked, or may not read.",
+      "registration_off": "This server takes no registration requests now (System settings → Integrations), or too many came; type an API key, or try again later.",
       "unknown": "The server answered unexpectedly."
     },
     "abort": {
       "already_configured": "This server is already set up.",
+      "cannot_connect": "The server cannot be reached.",
       "not_massimo": "This is not a Massimo server.",
-      "wrong_server": "The key belongs to another server.",
-      "reauth_successful": "The new API key works."
+      "wrong_server": "That is another Massimo server than this entry's.",
+      "registration_gone": "The request was refused, or it expired before it was approved.",
+      "registration_failed": "The key of the approved request could not be collected; try again.",
+      "reauth_successful": "Home Assistant signs in to Massimo again.",
+      "reconfigure_successful": "The entry is changed."
     }
   },
   "entity": {

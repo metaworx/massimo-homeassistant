@@ -1,3 +1,3 @@
-- The client of Massimo's API registers by a code, names the Home
-  Assistant user a call is made for, and tells Massimo's refusals of such
-  a call apart, for a Massimo with the feature `integration`.
+- Home Assistant registers with Massimo by a code the owner approves,
+  a typed key still offered, from a Massimo with the feature
+  `integration` (`README.md`, "Setting up").
