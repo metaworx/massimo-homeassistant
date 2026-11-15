@@ -34,6 +34,7 @@ from datetime import datetime
 from typing import Any, override
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr
@@ -54,7 +55,17 @@ from .api import (
     StreamEvent,
     on_behalf,
 )
-from .const import DOMAIN, LOGGER, RECONNECT_FIRST, RECONNECT_LAST, REFRESH_KINDS, THERMOSTATS
+from .const import (
+    CONF_AUTO_TITLE,
+    CONF_REGISTERED,
+    DOMAIN,
+    LOGGER,
+    RECONNECT_FIRST,
+    RECONNECT_LAST,
+    REFRESH_KINDS,
+    THERMOSTATS,
+)
+from .title import entry_name, entry_title, title_is_automatic
 
 type MassimoConfigEntry = ConfigEntry[MassimoCoordinator]
 
@@ -183,6 +194,10 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
         # The registered integration whose key the entry has, as /me
         # names it; None for a key typed by hand, or an older Massimo.
         self.integration: dict[str, Any] | None = None
+        # The server's /me for the key: its user and mode.
+        self.me: dict[str, Any] = {}
+        # When the server last answered a read, or sent an event.
+        self.last_contact: datetime | None = None
 
     @override
     async def _async_update_data(self) -> MassimoData:
@@ -201,6 +216,7 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
             raise UpdateFailed(str(err)) from err
         data = MassimoData(server, cubes)
         self._prune(data)
+        self.last_contact = dt_util.utcnow()
         return data
 
     def _configure(self, server: dict[str, Any]) -> None:
@@ -218,15 +234,13 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
             )
 
     async def _read_integration(self, server: dict[str, Any]) -> None:
-        """Whether the key is a registered integration's, and the repairs
-        that follow from it."""
-        self.integration = None
-        users = False
-        if has_feature(server, "integration"):
-            me = await self.client.me()
-            self.integration = me.get("integration")
-            users = me.get("mode") == "users"
-        self.set_issue(ISSUE_REGISTER, users and self.integration is None)
+        """The key's user, whether the key is a registered integration's,
+        and the repairs and the title that follow from it."""
+        self.me = await self.client.me()
+        self.integration = self.me.get("integration") if has_feature(server, "integration") else None
+        users = self.me.get("mode") == "users"
+        self.set_issue(ISSUE_REGISTER, users and has_feature(server, "integration") and self.integration is None)
+        await self._keep_title()
         moved = False
         if self.integration is not None:
             instance = await instance_id.async_get(self.hass)
@@ -238,6 +252,21 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
                 except MassimoRefusedError:
                     moved = True
         self.set_issue(ISSUE_INSTANCE, moved)
+
+    async def _keep_title(self) -> None:
+        """The entry's title set from its name and the way it signs in,
+        unless renamed by hand; whether it is registered noted."""
+        entry = self.config_entry
+        registered = self.integration is not None
+        data = entry.data | {CONF_REGISTERED: registered}
+        title = entry.title
+        if title_is_automatic(entry):
+            name = entry_name(entry)
+            user = (self.me.get("user") or {}).get("name")
+            title = await entry_title(self.hass, name, user, registered)
+            data |= {CONF_NAME: name, CONF_AUTO_TITLE: title}
+        if title != entry.title or data != entry.data:
+            self.hass.config_entries.async_update_entry(entry, title=title, data=data)
 
     @callback
     def set_issue(self, name: str, holds: bool) -> None:
@@ -312,6 +341,7 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
     @callback
     def _apply(self, serial: str, event: StreamEvent) -> None:
         """Take an event into the data."""
+        self.last_contact = dt_util.utcnow()
         if event.kind == "open":
             if not self.last_update_success:
                 self.async_set_updated_data(self.data)

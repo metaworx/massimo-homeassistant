@@ -1,7 +1,9 @@
 """The entities' common ground: the devices they belong to, and when they
 are available.
 
-A Cube is a hub, registered when the entry is set up, and each of its
+The server is a device of its own, by its node id, the entry's unique id:
+its version, its address to visit, and the connection's diagnostics.
+A Cube is a hub beneath it, registered when the entry is set up, and each of its
 devices a device of its own beneath it, found by its serial, which stays the
 same if it is paired to another Cube. A device names its Cube by the Cube's
 device id (``via_device_id``): the identifier form, ``via_device``, is
@@ -50,6 +52,7 @@ from .api import (
 )
 from .const import DOMAIN, MANUFACTURER, MODELS
 from .coordinator import ISSUE_INSTANCE, CubeData, MassimoConfigEntry, MassimoCoordinator, room_key
+from .title import entry_name
 
 # Massimo's refusals of a call made for a user, each with a text of its own.
 REFUSALS = frozenset(
@@ -57,9 +60,38 @@ REFUSALS = frozenset(
 )
 
 
+def server_id(coordinator: MassimoCoordinator) -> str:
+    """The server's device identifier: its node id, the entry's unique id."""
+    return coordinator.config_entry.unique_id or coordinator.client.url
+
+
+def massimo_version(server: dict[str, Any]) -> str | None:
+    """Massimo's version from its health: "massimo v1.2.3 (go…)" → "1.2.3"."""
+    words = str(server.get("version") or "").split()
+    if len(words) > 1 and words[0] == "massimo":
+        return words[1].removeprefix("v")
+    return words[0] if words else None
+
+
+def server_device(coordinator: MassimoCoordinator) -> dict[str, Any]:
+    """The server's device, as the device registry takes it."""
+    return {
+        "identifiers": {(DOMAIN, server_id(coordinator))},
+        "name": entry_name(coordinator.config_entry),
+        "manufacturer": "Massimo",
+        "model": "Server",
+        "sw_version": massimo_version(coordinator.data.server),
+        "configuration_url": coordinator.client.url,
+    }
+
+
 def cube_device(coordinator: MassimoCoordinator, serial: str) -> dict[str, Any]:
-    """A Cube's device, as the device registry takes it."""
+    """A Cube's device, as the device registry takes it, beneath the
+    server's."""
     info = coordinator.data.cubes[serial].info
+    server = dr.async_get(coordinator.hass).async_get_device_by_identifier(
+        (DOMAIN, server_id(coordinator)), coordinator.config_entry.entry_id
+    )
     return {
         "identifiers": {(DOMAIN, serial)},
         "name": info.get("name") or serial,
@@ -68,6 +100,7 @@ def cube_device(coordinator: MassimoCoordinator, serial: str) -> dict[str, Any]:
         "serial_number": serial,
         "sw_version": info.get("firmware"),
         "configuration_url": coordinator.client.url,
+        "via_device_id": server.id if server else None,
     }
 
 
@@ -112,8 +145,10 @@ async def on_behalf_of(hass: HomeAssistant, context: Context | None, entity_id: 
 
 
 def register_cubes(coordinator: MassimoCoordinator) -> None:
-    """Register the Cubes' devices, so that their devices can name them."""
+    """Register the server's device, then the Cubes' beneath it, so that
+    their devices can name them."""
     registry = dr.async_get(coordinator.hass)
+    registry.async_get_or_create(config_entry_id=coordinator.config_entry.entry_id, **server_device(coordinator))
     for serial in coordinator.data.cubes:
         registry.async_get_or_create(
             config_entry_id=coordinator.config_entry.entry_id, **cube_device(coordinator, serial)
@@ -156,6 +191,17 @@ class MassimoEntity(CoordinatorEntity[MassimoCoordinator]):
         if coordinator.integration is not None:
             coordinator.set_issue(ISSUE_INSTANCE, False)
         return answer
+
+
+class ServerEntity(MassimoEntity):
+    """An entity of the server itself: the connection's diagnostics."""
+
+    def __init__(self, coordinator: MassimoCoordinator, description: EntityDescription) -> None:
+        """Initialise the server's entity of a description."""
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._attr_unique_id = f"{server_id(coordinator)}_{description.key}"
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, server_id(coordinator))})
 
 
 class CubeEntity(MassimoEntity):

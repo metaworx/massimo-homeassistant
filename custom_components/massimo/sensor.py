@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, override
 
 from homeassistant.components.sensor import (
@@ -19,7 +20,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import RADIATOR_THERMOSTATS, THERMOSTATS
 from .coordinator import MassimoConfigEntry
-from .entity import CubeEntity, DeviceEntity, add_entities_as_they_come, devices_of
+from .entity import CubeEntity, DeviceEntity, ServerEntity, add_entities_as_they_come, devices_of
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -91,11 +92,30 @@ CUBE_SENSORS = (
 )
 
 
+# The server's: when it last answered or sent an event, off by default
+# since it changes with each; and how the entry signs in to it.
+LAST_CONTACT = SensorEntityDescription(
+    key="last_contact",
+    translation_key="last_contact",
+    device_class=SensorDeviceClass.TIMESTAMP,
+    entity_category=EntityCategory.DIAGNOSTIC,
+    entity_registry_enabled_default=False,
+)
+SIGNED_IN_AS = SensorEntityDescription(
+    key="signed_in_as",
+    translation_key="signed_in_as",
+    device_class=SensorDeviceClass.ENUM,
+    options=["registered", "user_key", "no_users"],
+    entity_category=EntityCategory.DIAGNOSTIC,
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: MassimoConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
-    """Add the sensors of the server's Cubes and devices."""
+    """Add the sensors of the server, its Cubes and devices."""
     coordinator = entry.runtime_data
+    async_add_entities([LastContact(coordinator, LAST_CONTACT), SignedInAs(coordinator, SIGNED_IN_AS)])
 
     def make():
         for serial in coordinator.data.cubes:
@@ -132,3 +152,40 @@ class CubeSensor(CubeEntity, SensorEntity):
         """The value the Cube last reported."""
         cube = self.cube
         return self.entity_description.value_fn(cube.info) if cube else None
+
+
+class LastContact(ServerEntity, SensorEntity):
+    """When the server last answered a read or sent an event."""
+
+    @property
+    @override
+    def available(self) -> bool:
+        """Always: the time stays known while the connection is lost."""
+        return self.coordinator.last_contact is not None
+
+    @property
+    @override
+    def native_value(self) -> datetime | None:
+        """The last contact."""
+        return self.coordinator.last_contact
+
+
+class SignedInAs(ServerEntity, SensorEntity):
+    """How the entry signs in: registered, with a person's key, or to a
+    server without users."""
+
+    @property
+    @override
+    def native_value(self) -> str:
+        """The way the entry signs in."""
+        if self.coordinator.integration is not None:
+            return "registered"
+        return "user_key" if self.coordinator.me.get("mode") == "users" else "no_users"
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """The key's person, where it is one's."""
+        if self.native_value != "user_key":
+            return {}
+        return {"user": (self.coordinator.me.get("user") or {}).get("name")}

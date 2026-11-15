@@ -98,9 +98,16 @@ jobs:
         with:
           go-version-file: massimo/go.mod
           cache-dependency-path: massimo/go.sum
+      # The web UI's bundle first, as Massimo's make ui builds it: git does
+      # not keep internal/server/ui/parts.js, which the server embeds. A
+      # Massimo from before the bundle (tools/uibundle) has nothing to build.
       - name: Build massimo
         working-directory: massimo
-        run: CGO_ENABLED=0 go build -o "$RUNNER_TEMP/massimo" ./cmd/massimo
+        run: |
+          if [ -d tools/uibundle ]; then
+            GOOS='' GOARCH='' GOARM='' go -C tools/uibundle run .
+          fi
+          CGO_ENABLED=0 go build -o "$RUNNER_TEMP/massimo" ./cmd/massimo
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.14"

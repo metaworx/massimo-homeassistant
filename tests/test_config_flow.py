@@ -7,14 +7,20 @@ from typing import Any
 
 import pytest
 from homeassistant.config_entries import SOURCE_USER, SOURCE_ZEROCONF
-from homeassistant.const import CONF_API_KEY, CONF_URL, CONF_VERIFY_SSL
+from homeassistant.const import CONF_API_KEY, CONF_NAME, CONF_URL, CONF_VERIFY_SSL
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.massimo import config_flow
-from custom_components.massimo.const import DOMAIN
+from custom_components.massimo.const import (
+    CONF_ANNOUNCED,
+    CONF_AUTO_TITLE,
+    CONF_REGISTERED,
+    CONF_REGISTRATION_NAME,
+    DOMAIN,
+)
 
 from .conftest import INSTANCE, Server, http
 
@@ -50,6 +56,19 @@ async def _decide(hass: HomeAssistant, server: Server, result: dict[str, Any], d
     return await hass.config_entries.flow.async_configure(result["flow_id"])
 
 
+async def _register(hass: HomeAssistant, flow_id: str, **names: str) -> dict[str, Any]:
+    """Register chosen from the menu, and the names form sent: the request
+    made."""
+    result = await hass.config_entries.flow.async_configure(flow_id, {"next_step_id": "register"})
+    assert result["type"] is FlowResultType.FORM and result["step_id"] == "register", result
+    return await hass.config_entries.flow.async_configure(flow_id, names)
+
+
+def _default(result: dict[str, Any], field: str) -> Any:
+    """The default a form's field is shown with."""
+    return next(k.default() for k in result["data_schema"].schema if k == field)
+
+
 async def _address(hass: HomeAssistant, url: str) -> dict[str, Any]:
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
     assert result["type"] is FlowResultType.FORM and result["step_id"] == "user"
@@ -62,10 +81,15 @@ async def test_registers_by_a_code(hass: HomeAssistant, massimo_server: Server, 
     the server's node id; the same server again is refused."""
     result = await _address(hass, massimo_server.url + "/")
     assert result["type"] is FlowResultType.MENU and result["menu_options"] == ["register", "api_key"]
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "register"})
+    result = await _register(
+        hass, result["flow_id"], **{CONF_REGISTRATION_NAME: "Casa Leone", CONF_NAME: "Massimo Keller"}
+    )
+    assert _request(massimo_server, result["description_placeholders"]["code"])["name"] == "Casa Leone"
     result = await _decide(hass, massimo_server, result, "approve")
     assert result["type"] is FlowResultType.CREATE_ENTRY, result
+    assert result["title"] == "Massimo Keller"
     assert result["data"][CONF_URL] == massimo_server.url
+    assert result["data"][CONF_REGISTERED] is True and result["data"][CONF_ANNOUNCED] is False
     key = result["data"][CONF_API_KEY]
     me = http("GET", massimo_server.url + "/api/v1/me", key)
     assert me["integration"]["instance_id"] == INSTANCE  # type: ignore[index]
@@ -78,14 +102,15 @@ async def test_registers_by_a_code(hass: HomeAssistant, massimo_server: Server, 
 async def test_a_refused_registration(hass: HomeAssistant, massimo_server: Server, socket_enabled: None) -> None:
     """A request the owner refuses ends the flow, saying so."""
     result = await _address(hass, massimo_server.url)
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "register"})
+    result = await _register(hass, result["flow_id"])
     result = await _decide(hass, massimo_server, result, "refuse")
     assert result["type"] is FlowResultType.ABORT and result["reason"] == "registration_gone"
 
 
 async def test_a_key_typed_by_hand(hass: HomeAssistant, massimo_server: Server, socket_enabled: None) -> None:
-    """A key typed by hand makes an entry named by the key's user; a wrong
-    key and an unreachable address are said."""
+    """A key typed by hand makes an entry named, by default, by the
+    server's host, its title saying whose key it is; a wrong key and an
+    unreachable address are said."""
     result = await _address(hass, massimo_server.url)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "api_key"})
     assert result["type"] is FlowResultType.FORM and result["step_id"] == "api_key"
@@ -93,11 +118,15 @@ async def test_a_key_typed_by_hand(hass: HomeAssistant, massimo_server: Server, 
     assert result["type"] is FlowResultType.FORM and result["errors"] == {"base": "invalid_auth"}
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_API_KEY: massimo_server.typed_key})
     assert result["type"] is FlowResultType.CREATE_ENTRY, result
-    assert result["title"] == "Massimo (hand)"
+    assert result["title"] == "Massimo 127.0.0.1 (key of hand)"
     assert result["data"] == {
         CONF_URL: massimo_server.url,
         CONF_API_KEY: massimo_server.typed_key,
         CONF_VERIFY_SSL: True,
+        CONF_NAME: "Massimo 127.0.0.1",
+        CONF_REGISTERED: False,
+        CONF_ANNOUNCED: False,
+        CONF_AUTO_TITLE: "Massimo 127.0.0.1 (key of hand)",
     }
     await _unload_all(hass)
     unreachable = await _address(hass, "http://127.0.0.1:9")
@@ -118,12 +147,13 @@ async def test_reconfigured_to_register(hass: HomeAssistant, massimo_server: Ser
         result["flow_id"], {CONF_URL: massimo_server.url, CONF_VERIFY_SSL: True}
     )
     assert result["type"] is FlowResultType.MENU
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "register"})
+    result = await _register(hass, result["flow_id"])
     result = await _decide(hass, massimo_server, result, "approve")
     assert result["type"] is FlowResultType.ABORT and result["reason"] == "reconfigure_successful", result
     assert entry.data[CONF_API_KEY] != massimo_server.typed_key
     me = http("GET", massimo_server.url + "/api/v1/me", entry.data[CONF_API_KEY])
     assert me["integration"] is not None  # type: ignore[index]
+    assert entry.data[CONF_REGISTERED] is True
     await _unload_all(hass)
 
 
@@ -153,7 +183,8 @@ def _found(server: Server, port: int, **props: str) -> ZeroconfServiceInfo:
         hostname="massimo-test.local.",
         type="_massimo._tcp.local.",
         name="Massimo test._massimo._tcp.local.",
-        properties={"node": server.node_id or "test-node", "v": "test", "tls": "0", "name": "test"} | props,
+        properties={"node": server.node_id or "test-node", "v": "test", "tls": "0", "name": "test", "loc": "test-loc"}
+        | props,
     )
 
 
@@ -199,3 +230,66 @@ async def test_zeroconf_without_a_node_is_not_massimo(hass: HomeAssistant) -> No
     )
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_ZEROCONF}, data=info)
     assert result["type"] is FlowResultType.ABORT and result["reason"] == "not_massimo"
+
+
+async def test_a_discovered_flow_reads_the_server_when_opened(
+    hass: HomeAssistant, massimo_server: Server, socket_enabled: None
+) -> None:
+    """A server discovered while its record said it takes no requests
+    shows the key form; opened again later, the flow reads the server again
+    and offers registration, which the request itself then decides."""
+    info = _found(massimo_server, massimo_server.port, reg="0", api="1")
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_ZEROCONF}, data=info)
+    assert result["type"] is FlowResultType.FORM and result["step_id"] == "api_key"
+    result = await hass.config_entries.flow.async_configure(result["flow_id"])
+    assert result["type"] is FlowResultType.MENU and result["step_id"] == "sign_in"
+    result = await hass.config_entries.flow.async_configure(result["flow_id"])
+    assert result["type"] is FlowResultType.MENU
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "api_key"})
+    assert result["type"] is FlowResultType.FORM and result["step_id"] == "api_key"
+    assert _default(result, CONF_NAME) == "Massimo test-loc"
+    hass.config_entries.flow.async_abort(result["flow_id"])
+
+
+def _entry(server: Server, url: str, **data: Any) -> MockConfigEntry:
+    return MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=server.node_id or server.url,
+        data={CONF_URL: url, CONF_API_KEY: server.key, CONF_VERIFY_SSL: True} | data,
+    )
+
+
+async def test_discovery_keeps_an_address_typed(
+    hass: HomeAssistant, massimo_server: Server, socket_enabled: None
+) -> None:
+    """A discovery changes no address typed by hand; a registered entry
+    takes the address the record names, where it answers; an entry whose
+    address came from an announcement takes the one found."""
+    typed = f"http://localhost:{massimo_server.port}"
+    found = _found(massimo_server, 9, url=massimo_server.url, reg="1", api="1")
+    cases = [
+        ({CONF_REGISTERED: False, CONF_ANNOUNCED: False}, found, typed),
+        ({CONF_REGISTERED: True, CONF_ANNOUNCED: False}, found, massimo_server.url),
+        ({CONF_REGISTERED: True}, _found(massimo_server, massimo_server.port, url="http://127.0.0.1:9"), typed),
+        ({CONF_ANNOUNCED: True}, _found(massimo_server, massimo_server.port), massimo_server.url),
+    ]
+    for data, info, kept in cases:
+        entry = _entry(massimo_server, typed, **data)
+        entry.add_to_hass(hass)
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_ZEROCONF}, data=info)
+        assert result["type"] is FlowResultType.ABORT and result["reason"] == "already_configured"
+        assert entry.data[CONF_URL] == kept, data
+        await hass.config_entries.async_remove(entry.entry_id)
+
+
+async def test_add_starts_from_a_discovered_server(
+    hass: HomeAssistant, massimo_server: Server, socket_enabled: None
+) -> None:
+    """Adding Massimo by hand, as Massimo's own button does, starts from the
+    address of a server discovered and not set up yet."""
+    info = _found(massimo_server, 9, url=massimo_server.url, reg="1", api="1")
+    found = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_ZEROCONF}, data=info)
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    assert result["type"] is FlowResultType.FORM and _default(result, CONF_URL) == massimo_server.url
+    hass.config_entries.flow.async_abort(result["flow_id"])
+    hass.config_entries.flow.async_abort(found["flow_id"])

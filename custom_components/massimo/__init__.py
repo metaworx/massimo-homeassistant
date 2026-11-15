@@ -17,7 +17,7 @@ from homeassistant.helpers.typing import ConfigType
 from .api import MassimoClient
 from .const import DOMAIN
 from .coordinator import MassimoConfigEntry, MassimoCoordinator
-from .entity import register_cubes
+from .entity import register_cubes, server_id
 from .frontend import async_register_frontend
 from .services import async_register_services
 
@@ -65,6 +65,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: MassimoConfigEntry) -> 
 async def async_remove_config_entry_device(
     hass: HomeAssistant, entry: MassimoConfigEntry, device: dr.DeviceEntry
 ) -> bool:
-    """A device may be removed by hand once the server no longer lists it."""
-    serials = entry.runtime_data.data.serials()
-    return not any(domain == DOMAIN and ident in serials for domain, ident in device.identifiers)
+    """A device may be removed by hand once the server no longer lists it;
+    the server's own, never while its entry is set up."""
+    kept = entry.runtime_data.data.serials() | {server_id(entry.runtime_data)}
+    return not any(domain == DOMAIN and ident in kept for domain, ident in device.identifiers)
