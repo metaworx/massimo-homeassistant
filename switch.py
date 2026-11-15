@@ -57,4 +57,4 @@ class KeyLock(DeviceEntity, SwitchEntity):
         if found is None:
             raise HomeAssistantError(translation_domain=DOMAIN, translation_key="device_gone")
         cube_serial, _, dev = found
-        await self.write(self.coordinator.client.set_lock(cube_serial, dev["rf_address"], locked))
+        await self.write(lambda client: client.set_lock(cube_serial, dev["rf_address"], locked))

@@ -19,6 +19,11 @@ its settings and its programme's tag (``GET …/devices/{vwt}``), read again
 with the rooms after a configuration change. Where a room's tag differs from
 the one read before, its programme changed, and the time it was seen is
 kept for the room's climate.
+
+With ``integration``, the key may be a registered integration's (``/me``
+names it): the entities' calls then name the user they are made for. A key
+typed by hand on such a server, and a registration accepted from another
+installation id than this one's, are repairs.
 """
 
 from __future__ import annotations
@@ -32,13 +37,31 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import instance_id
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import DEVICES_ALL, DEVICES_REAL, MassimoAuthError, MassimoClient, MassimoError, StreamEvent
+from .api import (
+    DEVICES_ALL,
+    DEVICES_REAL,
+    LEVEL_VIEW,
+    SYSTEM,
+    MassimoAuthError,
+    MassimoClient,
+    MassimoError,
+    MassimoRefusedError,
+    StreamEvent,
+    on_behalf,
+)
 from .const import DOMAIN, LOGGER, RECONNECT_FIRST, RECONNECT_LAST, REFRESH_KINDS, THERMOSTATS
 
 type MassimoConfigEntry = ConfigEntry[MassimoCoordinator]
+
+# The entry's repairs: a key typed by hand where Home Assistant could
+# register, and a registration from another installation id.
+ISSUE_REGISTER = "register"
+ISSUE_INSTANCE = "instance_pending"
 
 
 def has_feature(server: dict[str, Any], name: str, minor: int = 0) -> bool:
@@ -157,6 +180,9 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
         self._warned_vwt = False
         # When a room's programme was last seen to change, by room_key.
         self.program_changed: dict[str, datetime] = {}
+        # The registered integration whose key the entry has, as /me
+        # names it; None for a key typed by hand, or an older Massimo.
+        self.integration: dict[str, Any] | None = None
 
     @override
     async def _async_update_data(self) -> MassimoData:
@@ -164,6 +190,7 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
         try:
             server = await self.client.health()
             self._configure(server)
+            await self._read_integration(server)
             cubes = {}
             for info in await self.client.cubes():
                 serial = info["serial"]
@@ -189,6 +216,45 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
                 "%s has no virtual wall thermostats (the feature vwt): its rooms need a newer Massimo",
                 self.client.url,
             )
+
+    async def _read_integration(self, server: dict[str, Any]) -> None:
+        """Whether the key is a registered integration's, and the repairs
+        that follow from it."""
+        self.integration = None
+        users = False
+        if has_feature(server, "integration"):
+            me = await self.client.me()
+            self.integration = me.get("integration")
+            users = me.get("mode") == "users"
+        self.set_issue(ISSUE_REGISTER, users and self.integration is None)
+        moved = False
+        if self.integration is not None:
+            instance = await instance_id.async_get(self.hass)
+            if self.integration.get("instance_id") != instance:
+                # One call from this installation, so that Massimo notes
+                # its id for the owner to accept.
+                try:
+                    await self.client.acting_for(on_behalf(SYSTEM, LEVEL_VIEW, instance)).me()
+                except MassimoRefusedError:
+                    moved = True
+        self.set_issue(ISSUE_INSTANCE, moved)
+
+    @callback
+    def set_issue(self, name: str, holds: bool) -> None:
+        """Raise one of the entry's repairs, or remove it."""
+        issue_id = f"{name}_{self.config_entry.entry_id}"
+        if not holds:
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+            return
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=name,
+            translation_placeholders={"title": self.config_entry.title, "url": self.client.url},
+        )
 
     async def _read_rooms(self, serial: str) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
         """A Cube's rooms, and each room's details from its virtual wall

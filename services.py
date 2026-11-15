@@ -47,7 +47,7 @@ async def _get_program(call: ServiceCall) -> ServiceResponse:
                 translation_key="not_a_room",
                 translation_placeholders={"entity_id": entity_id},
             )
-    return {entity_id: await rooms[entity_id].async_get_program() for entity_id in named}
+    return {entity_id: await rooms[entity_id].async_get_program(call.context) for entity_id in named}
 
 
 def async_register_services(hass: HomeAssistant) -> None:
