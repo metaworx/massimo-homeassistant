@@ -14,6 +14,9 @@ LOGGER = logging.getLogger(__package__)
 CONF_ANNOUNCED: Final = "announced"
 CONF_REGISTERED: Final = "registered"
 CONF_REGISTRATION_NAME: Final = "registration_name"
+# The title last set from the entry's name; one that differs was renamed by
+# hand (title.py).
+CONF_AUTO_TITLE: Final = "auto_title"
 
 # The mDNS service a Massimo server announces (Massimo's README, "Server").
 ZEROCONF_TYPE: Final = "_massimo._tcp.local."

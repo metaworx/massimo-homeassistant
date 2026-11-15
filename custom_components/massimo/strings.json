@@ -222,6 +222,9 @@
     },
     "refused_forbidden": {
       "message": "Massimo refused the call: your user there may not do this."
+    },
+    "title_key_of": {
+      "message": "{name} (key of {user})"
     }
   },
   "services": {

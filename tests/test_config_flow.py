@@ -14,7 +14,13 @@ from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.massimo import config_flow
-from custom_components.massimo.const import CONF_ANNOUNCED, CONF_REGISTERED, CONF_REGISTRATION_NAME, DOMAIN
+from custom_components.massimo.const import (
+    CONF_ANNOUNCED,
+    CONF_AUTO_TITLE,
+    CONF_REGISTERED,
+    CONF_REGISTRATION_NAME,
+    DOMAIN,
+)
 
 from .conftest import INSTANCE, Server, http
 
@@ -103,7 +109,8 @@ async def test_a_refused_registration(hass: HomeAssistant, massimo_server: Serve
 
 async def test_a_key_typed_by_hand(hass: HomeAssistant, massimo_server: Server, socket_enabled: None) -> None:
     """A key typed by hand makes an entry named, by default, by the
-    server's host; a wrong key and an unreachable address are said."""
+    server's host, its title saying whose key it is; a wrong key and an
+    unreachable address are said."""
     result = await _address(hass, massimo_server.url)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "api_key"})
     assert result["type"] is FlowResultType.FORM and result["step_id"] == "api_key"
@@ -111,7 +118,7 @@ async def test_a_key_typed_by_hand(hass: HomeAssistant, massimo_server: Server, 
     assert result["type"] is FlowResultType.FORM and result["errors"] == {"base": "invalid_auth"}
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_API_KEY: massimo_server.typed_key})
     assert result["type"] is FlowResultType.CREATE_ENTRY, result
-    assert result["title"] == "Massimo 127.0.0.1"
+    assert result["title"] == "Massimo 127.0.0.1 (key of hand)"
     assert result["data"] == {
         CONF_URL: massimo_server.url,
         CONF_API_KEY: massimo_server.typed_key,
@@ -119,6 +126,7 @@ async def test_a_key_typed_by_hand(hass: HomeAssistant, massimo_server: Server, 
         CONF_NAME: "Massimo 127.0.0.1",
         CONF_REGISTERED: False,
         CONF_ANNOUNCED: False,
+        CONF_AUTO_TITLE: "Massimo 127.0.0.1 (key of hand)",
     }
     await _unload_all(hass)
     unreachable = await _address(hass, "http://127.0.0.1:9")

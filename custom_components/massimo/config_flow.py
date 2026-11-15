@@ -50,8 +50,9 @@ from .api import (
     MassimoRegistrationGoneError,
     MassimoRegistrationOffError,
 )
-from .const import CONF_ANNOUNCED, CONF_REGISTERED, CONF_REGISTRATION_NAME, DOMAIN, LOGGER
+from .const import CONF_ANNOUNCED, CONF_AUTO_TITLE, CONF_REGISTERED, CONF_REGISTRATION_NAME, DOMAIN, LOGGER
 from .coordinator import has_feature
+from .title import entry_name, entry_title, title_is_automatic
 
 # What the integration needs at least: reading. Setpoints and week
 # programmes need setpoint and configure, which the role integration has.
@@ -227,14 +228,20 @@ class MassimoConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_VERIFY_SSL: self.verify_ssl,
             CONF_REGISTERED: registered,
         }
-        if self.source == SOURCE_REAUTH:
+        if self.source in (SOURCE_REAUTH, SOURCE_RECONFIGURE):
             self._abort_if_unique_id_mismatch(reason="wrong_server")
-            return self.async_update_reload_and_abort(self._get_reauth_entry(), data_updates=data)
+            entry = self._get_reauth_entry() if self.source == SOURCE_REAUTH else self._get_reconfigure_entry()
+            if self.source == SOURCE_REAUTH:
+                data[CONF_NAME] = entry_name(entry)
+            else:
+                data |= {CONF_NAME: self.entry_name or self._default_name(), CONF_ANNOUNCED: self.announced}
+            if not title_is_automatic(entry):
+                return self.async_update_reload_and_abort(entry, data_updates=data)
+            title = await entry_title(self.hass, data[CONF_NAME], user, registered)
+            return self.async_update_reload_and_abort(entry, title=title, data_updates=data | {CONF_AUTO_TITLE: title})
         data |= {CONF_NAME: self.entry_name or self._default_name(), CONF_ANNOUNCED: self.announced}
-        if self.source == SOURCE_RECONFIGURE:
-            self._abort_if_unique_id_mismatch(reason="wrong_server")
-            return self.async_update_reload_and_abort(self._get_reconfigure_entry(), data_updates=data)
-        return self.async_create_entry(title=data[CONF_NAME], data=data)
+        title = await entry_title(self.hass, data[CONF_NAME], user, registered)
+        return self.async_create_entry(title=title, data=data | {CONF_AUTO_TITLE: title})
 
     @override
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:

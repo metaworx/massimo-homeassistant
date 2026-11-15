@@ -222,6 +222,9 @@
     },
     "refused_forbidden": {
       "message": "Massimo hat den Aufruf abgelehnt: Ihr Benutzer dort darf das nicht."
+    },
+    "title_key_of": {
+      "message": "{name} (Schlüssel von {user})"
     }
   },
   "services": {
