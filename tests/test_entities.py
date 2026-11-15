@@ -144,7 +144,9 @@ async def test_the_key_lock_writes_through_massimo(
     assert hass.states.get(lock).state == STATE_OFF
 
     def locks() -> list[dict]:
-        rows = http("GET", f"{massimo_server.url}/api/v1/audit?user=homeassistant&limit=50", massimo_server.owner)
+        # A call no user started acts as the integration's system user.
+        url = f"{massimo_server.url}/api/v1/audit?user=homeassistant.system&limit=50"
+        rows = http("GET", url, massimo_server.owner)
         return [r for r in rows if r["action"] == "device.lock"]  # type: ignore[union-attr]
 
     before = len(await hass.async_add_executor_job(locks))
@@ -154,6 +156,8 @@ async def test_the_key_lock_writes_through_massimo(
         assert rows[0]["target"] == f"device:{thermostat['serial']}"
         assert rows[0]["detail"]["body"] == {"locked": locked}
         assert rows[0]["result"] == "ok"
+        assert rows[0]["detail"]["via"] == "homeassistant"
+        assert rows[0]["detail"]["for"]["id"] == "system"
         await _until(hass, lambda shown=shown: hass.states.get(lock).state == shown, f"the switch shows {shown}")
     assert len(await hass.async_add_executor_job(locks)) == before + 2
     await _unload(hass, entry)

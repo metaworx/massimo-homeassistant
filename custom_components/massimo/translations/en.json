@@ -190,6 +190,24 @@
     },
     "program_end": {
       "message": "{day}'s last switch point must end at 24:00."
+    },
+    "refused_bad_header": {
+      "message": "Massimo could not read whom the call was made for."
+    },
+    "refused_not_integration": {
+      "message": "Massimo refused the call: the key is no registered integration's."
+    },
+    "refused_integration_disabled": {
+      "message": "Massimo refused the call: this integration is disabled there (System settings → Integrations)."
+    },
+    "refused_instance_pending": {
+      "message": "Massimo refused the call: it accepted another installation of Home Assistant for this integration. Accept this one there, under System settings → Integrations."
+    },
+    "refused_user_disabled": {
+      "message": "Massimo refused the call: your user there, or the user it is linked to, is disabled."
+    },
+    "refused_forbidden": {
+      "message": "Massimo refused the call: your user there may not do this."
     }
   },
   "services": {
@@ -255,6 +273,16 @@
         "saturday": "Saturday",
         "sunday": "Sunday"
       }
+    }
+  },
+  "issues": {
+    "register": {
+      "title": "Register Home Assistant with Massimo",
+      "description": "{title} signs in to Massimo at {url} with a key typed by hand, so Massimo sees every call as that key's user. Registered, Home Assistant names the user each call is made for, and Massimo allows each user what their level allows. Reconfigure the entry and choose to register; Massimo's owner then approves the request under System settings → Integrations."
+    },
+    "instance_pending": {
+      "title": "Accept this installation in Massimo",
+      "description": "Massimo at {url} accepted another installation of Home Assistant for {title}, as after a backup restored on another machine. Until its owner accepts this one under System settings → Integrations, Massimo refuses the calls made here for users and automations; reading the devices goes on."
     }
   }
 }

@@ -12,6 +12,14 @@ once, and the areas stay the owner's.
 A room is a device too, backed by its virtual wall thermostat (Massimo's
 VWT): identified by its Cube and its room_uid, it stays the room's for the
 room's life, whatever thermostats come and go in it.
+
+Each call an entity makes for a service call - a write, a programme read -
+names the Home Assistant user it is made for, where the key is a
+registered integration's (Massimo's docs/api-v1.md, "Acting for an
+integration's users"): the user's id and name, and the level the user has
+for the entity, ``admin`` for an administrator, otherwise ``control`` or
+``view``; a call no user started, such as an automation's, is ``system``'s.
+Massimo allows only what every link of that chain allows.
 """
 
 from __future__ import annotations
@@ -19,18 +27,34 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any, override
 
-from homeassistant.auth.permissions.const import POLICY_READ
+from homeassistant.auth.permissions.const import POLICY_CONTROL, POLICY_READ
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, Unauthorized, UnknownUser
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import instance_id
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity, EntityDescription
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .api import MassimoDiscardedError, MassimoError
+from .api import (
+    LEVEL_ADMIN,
+    LEVEL_CONTROL,
+    LEVEL_VIEW,
+    SYSTEM,
+    MassimoClient,
+    MassimoDiscardedError,
+    MassimoError,
+    MassimoRefusedError,
+    on_behalf,
+)
 from .const import DOMAIN, MANUFACTURER, MODELS
-from .coordinator import CubeData, MassimoConfigEntry, MassimoCoordinator, room_key
+from .coordinator import ISSUE_INSTANCE, CubeData, MassimoConfigEntry, MassimoCoordinator, room_key
+
+# Massimo's refusals of a call made for a user, each with a text of its own.
+REFUSALS = frozenset(
+    {"bad_header", "not_integration", "integration_disabled", "instance_pending", "user_disabled", "forbidden"}
+)
 
 
 def cube_device(coordinator: MassimoCoordinator, serial: str) -> dict[str, Any]:
@@ -69,6 +93,24 @@ async def check_read(hass: HomeAssistant, context: Context | None, entity_ids: I
             raise Unauthorized(context=context, entity_id=entity_id, permission=POLICY_READ)
 
 
+async def on_behalf_of(hass: HomeAssistant, context: Context | None, entity_id: str) -> str:
+    """The header naming the user a call on an entity is made for, with
+    the user's level for that entity; ``system`` for a call without one."""
+    instance = await instance_id.async_get(hass)
+    if context is None or not context.user_id:
+        return on_behalf(SYSTEM, LEVEL_ADMIN, instance)
+    user = await hass.auth.async_get_user(context.user_id)
+    if user is None:
+        raise UnknownUser(context=context, user_id=context.user_id)
+    if user.is_admin:
+        level = LEVEL_ADMIN
+    elif user.permissions.check_entity(entity_id, POLICY_CONTROL):
+        level = LEVEL_CONTROL
+    else:
+        level = LEVEL_VIEW
+    return on_behalf(user.id, level, instance, user.name, system_generated=user.system_generated)
+
+
 def register_cubes(coordinator: MassimoCoordinator) -> None:
     """Register the Cubes' devices, so that their devices can name them."""
     registry = dr.async_get(coordinator.hass)
@@ -83,19 +125,37 @@ class MassimoEntity(CoordinatorEntity[MassimoCoordinator]):
 
     _attr_has_entity_name = True
 
-    @staticmethod
-    async def write(request: Awaitable[Any]) -> Any:
-        """Send a write, a refusal raised as a translated error. The entity
-        shows what the devices report, so the change shows once they have
-        taken it."""
+    async def write(self, request: Callable[[MassimoClient], Awaitable[Any]], context: Context | None = None) -> Any:
+        """Send a call made for a service call, by the client acting for
+        its user - the context given, else the entity's, which Home
+        Assistant sets before an entity service runs; a refusal raised as a
+        translated error. The entity shows what the devices report, so a
+        change shows once they have taken it."""
+        coordinator = self.coordinator
+        client = coordinator.client
+        if coordinator.integration is not None:
+            client = client.acting_for(await on_behalf_of(self.hass, context or self._context, self.entity_id))
         try:
-            return await request
+            answer = await request(client)
         except MassimoDiscardedError as err:
             raise HomeAssistantError(translation_domain=DOMAIN, translation_key="discarded") from err
+        except MassimoRefusedError as err:
+            if err.code == "instance_pending":
+                coordinator.set_issue(ISSUE_INSTANCE, True)
+            if err.code not in REFUSALS:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="write_failed",
+                    translation_placeholders={"error": str(err)},
+                ) from err
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key=f"refused_{err.code}") from err
         except MassimoError as err:
             raise HomeAssistantError(
                 translation_domain=DOMAIN, translation_key="write_failed", translation_placeholders={"error": str(err)}
             ) from err
+        if coordinator.integration is not None:
+            coordinator.set_issue(ISSUE_INSTANCE, False)
+        return answer
 
 
 class CubeEntity(MassimoEntity):

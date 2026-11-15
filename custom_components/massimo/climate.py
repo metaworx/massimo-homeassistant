@@ -50,7 +50,7 @@ from homeassistant.components.climate import (
     HVACMode,
 )
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
-from homeassistant.core import HomeAssistant, ServiceResponse, SupportsResponse
+from homeassistant.core import Context, HomeAssistant, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
@@ -310,7 +310,7 @@ class RoomClimate(RoomEntity, ClimateEntity, RestoreEntity):
         rf = self.vwt.get("rf_address")
         if not rf:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="device_gone")
-        await self.write(self.coordinator.client.set_setpoint(self.cube_serial, rf, body))
+        await self.write(lambda client: client.set_setpoint(self.cube_serial, rf, body))
 
     @override
     async def async_set_temperature(self, **kwargs: Any) -> None:
@@ -377,15 +377,17 @@ class RoomClimate(RoomEntity, ClimateEntity, RestoreEntity):
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="device_gone")
         return rf
 
-    async def read_program(self) -> dict[str, Any]:
-        """The room's programme as Massimo answers it."""
-        return await self.write(self.coordinator.client.program(self.cube_serial, self._program_rf()))
+    async def read_program(self, context: Context | None = None) -> dict[str, Any]:
+        """The room's programme as Massimo answers it, read for the user of
+        the call given, else of the entity's own."""
+        rf = self._program_rf()
+        return await self.write(lambda client: client.program(self.cube_serial, rf), context)
 
-    async def async_get_program(self) -> ServiceResponse:
+    async def async_get_program(self, context: Context | None = None) -> ServiceResponse:
         """The room's week programme with its tag, whether a write to it is
         still on its way, whether its thermostats agree, and the device it
-        was read from."""
-        program = await self.read_program()
+        was read from; read for the user of the call given."""
+        program = await self.read_program(context)
         source = program.get("source")
         found = self.found
         names = {dev.get("rf_address"): dev.get("name") for dev in found[0].get("devices") or []} if found else {}
@@ -400,7 +402,7 @@ class RoomClimate(RoomEntity, ClimateEntity, RestoreEntity):
     async def _write_program(self, days: dict[str, Any], etag: str | None) -> dict[str, Any]:
         rf = self._program_rf()
         try:
-            answer = await self.write(self.coordinator.client.set_program(self.cube_serial, rf, days, etag))
+            answer = await self.write(lambda client: client.set_program(self.cube_serial, rf, days, etag))
         except HomeAssistantError as err:
             if isinstance(err.__cause__, MassimoChangedError):
                 raise HomeAssistantError(
@@ -437,6 +439,6 @@ class RoomClimate(RoomEntity, ClimateEntity, RestoreEntity):
             origin = entity
         elif not to_days:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="program_copy_nothing")
-        written = check_days(copied(await origin.read_program(), days, to_days))
+        written = check_days(copied(await origin.read_program(self._context), days, to_days))
         etag = (await self.read_program()).get("etag")
         await self._write_program(written, etag)

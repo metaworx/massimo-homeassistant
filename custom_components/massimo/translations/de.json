@@ -190,6 +190,24 @@
     },
     "program_end": {
       "message": "Der letzte Schaltpunkt von {day} muss um 24:00 enden."
+    },
+    "refused_bad_header": {
+      "message": "Massimo konnte nicht lesen, für wen der Aufruf ist."
+    },
+    "refused_not_integration": {
+      "message": "Massimo hat den Aufruf abgelehnt: Der Schlüssel gehört zu keiner registrierten Integration."
+    },
+    "refused_integration_disabled": {
+      "message": "Massimo hat den Aufruf abgelehnt: Diese Integration ist dort deaktiviert (Systemeinstellungen → Integrationen)."
+    },
+    "refused_instance_pending": {
+      "message": "Massimo hat den Aufruf abgelehnt: Es hat für diese Integration eine andere Installation von Home Assistant angenommen. Nehmen Sie diese dort an, unter Systemeinstellungen → Integrationen."
+    },
+    "refused_user_disabled": {
+      "message": "Massimo hat den Aufruf abgelehnt: Ihr Benutzer dort, oder der Benutzer, mit dem er verknüpft ist, ist deaktiviert."
+    },
+    "refused_forbidden": {
+      "message": "Massimo hat den Aufruf abgelehnt: Ihr Benutzer dort darf das nicht."
     }
   },
   "services": {
@@ -255,6 +273,16 @@
         "saturday": "Samstag",
         "sunday": "Sonntag"
       }
+    }
+  },
+  "issues": {
+    "register": {
+      "title": "Home Assistant bei Massimo registrieren",
+      "description": "{title} meldet sich bei Massimo unter {url} mit einem eingegebenen Schlüssel an, daher sieht Massimo jeden Aufruf als den des Benutzers dieses Schlüssels. Registriert nennt Home Assistant den Benutzer, für den ein Aufruf ist, und Massimo erlaubt jedem, was seine Stufe erlaubt. Konfigurieren Sie den Eintrag neu und wählen Sie die Registrierung; der Eigentümer von Massimo bestätigt die Anfrage dann unter Systemeinstellungen → Integrationen."
+    },
+    "instance_pending": {
+      "title": "Diese Installation in Massimo annehmen",
+      "description": "Massimo unter {url} hat für {title} eine andere Installation von Home Assistant angenommen, wie nach einem auf einem anderen Rechner wiederhergestellten Backup. Bis sein Eigentümer diese unter Systemeinstellungen → Integrationen annimmt, lehnt Massimo die Aufrufe ab, die hier für Benutzer und Automationen gemacht werden; das Lesen der Geräte geht weiter."
     }
   }
 }
