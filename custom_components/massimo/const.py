@@ -7,6 +7,14 @@ from typing import Final
 DOMAIN: Final = "massimo"
 LOGGER = logging.getLogger(__package__)
 
+# The entry's data beside its address and key: whether the address is the
+# one an announcement led to, which a later one may change, and whether the
+# key is a registered integration's. The name Home Assistant gives itself
+# in Massimo is a field of the flow alone.
+CONF_ANNOUNCED: Final = "announced"
+CONF_REGISTERED: Final = "registered"
+CONF_REGISTRATION_NAME: Final = "registration_name"
+
 # The mDNS service a Massimo server announces (Massimo's README, "Server").
 ZEROCONF_TYPE: Final = "_massimo._tcp.local."
 

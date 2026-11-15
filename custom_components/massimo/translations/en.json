@@ -34,14 +34,28 @@
           "api_key": "Type an API key"
         }
       },
+      "register": {
+        "title": "Massimo",
+        "description": "Home Assistant asks Massimo {name} at {url} to register it; the owner approves the request in Massimo.",
+        "data": {
+          "registration_name": "Name in Massimo",
+          "name": "Name in Home Assistant"
+        },
+        "data_description": {
+          "registration_name": "How Massimo lists this Home Assistant among its integrations",
+          "name": "The name of this Massimo server in Home Assistant"
+        }
+      },
       "api_key": {
         "title": "Massimo",
         "description": "An API key for Massimo {name} at {url}.",
         "data": {
-          "api_key": "API key"
+          "api_key": "API key",
+          "name": "Name in Home Assistant"
         },
         "data_description": {
-          "api_key": "An API key of a Massimo user who may read (personal settings → API keys); empty for a server without users"
+          "api_key": "An API key of a Massimo user who may read (personal settings → API keys); empty for a server without users",
+          "name": "The name of this Massimo server in Home Assistant"
         }
       }
     },

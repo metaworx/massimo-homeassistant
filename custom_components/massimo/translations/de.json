@@ -34,14 +34,28 @@
           "api_key": "Einen API-Schlüssel eingeben"
         }
       },
+      "register": {
+        "title": "Massimo",
+        "description": "Home Assistant bittet Massimo {name} unter {url}, es zu registrieren; der Eigentümer bestätigt die Anfrage in Massimo.",
+        "data": {
+          "registration_name": "Name in Massimo",
+          "name": "Name in Home Assistant"
+        },
+        "data_description": {
+          "registration_name": "Unter diesem Namen führt Massimo dieses Home Assistant bei seinen Integrationen",
+          "name": "Der Name dieses Massimo-Servers in Home Assistant"
+        }
+      },
       "api_key": {
         "title": "Massimo",
         "description": "Ein API-Schlüssel für Massimo {name} unter {url}.",
         "data": {
-          "api_key": "API-Schlüssel"
+          "api_key": "API-Schlüssel",
+          "name": "Name in Home Assistant"
         },
         "data_description": {
-          "api_key": "Ein API-Schlüssel eines Massimo-Benutzers, der lesen darf (Persönliche Einstellungen → API-Schlüssel); leer für einen Server ohne Benutzer"
+          "api_key": "Ein API-Schlüssel eines Massimo-Benutzers, der lesen darf (Persönliche Einstellungen → API-Schlüssel); leer für einen Server ohne Benutzer",
+          "name": "Der Name dieses Massimo-Servers in Home Assistant"
         }
       }
     },
