@@ -15,6 +15,16 @@
       },
       "queued": {
         "default": "mdi:tray-full"
+      },
+      "last_contact": {
+        "default": "mdi:clock-check-outline"
+      },
+      "signed_in_as": {
+        "default": "mdi:account-key",
+        "state": {
+          "registered": "mdi:shield-check",
+          "no_users": "mdi:lock-open-outline"
+        }
       }
     },
     "switch": {

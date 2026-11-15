@@ -1,5 +1,5 @@
 """Binary sensors: a device's battery, window and errors, a Cube's
-connection."""
+connection, the server's."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import MODELS
 from .coordinator import MassimoConfigEntry
-from .entity import CubeEntity, DeviceEntity, add_entities_as_they_come, devices_of
+from .entity import CubeEntity, DeviceEntity, ServerEntity, add_entities_as_they_come, devices_of
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -76,8 +76,9 @@ CONNECTED = BinarySensorEntityDescription(
 async def async_setup_entry(
     hass: HomeAssistant, entry: MassimoConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
-    """Add the binary sensors of the server's Cubes and devices."""
+    """Add the binary sensors of the server, its Cubes and devices."""
     coordinator = entry.runtime_data
+    async_add_entities([ServerConnected(coordinator, CONNECTED)])
 
     def make():
         for serial in coordinator.data.cubes:
@@ -118,3 +119,20 @@ class CubeConnected(CubeEntity, BinarySensorEntity):
         """Whether the Cube is connected."""
         cube = self.cube
         return bool(cube and cube.info.get("connected"))
+
+
+class ServerConnected(ServerEntity, BinarySensorEntity):
+    """Whether Home Assistant reaches the server and follows its events;
+    known at all times, so always available."""
+
+    @property
+    @override
+    def available(self) -> bool:
+        """Always: off says the connection is lost."""
+        return True
+
+    @property
+    @override
+    def is_on(self) -> bool:
+        """Whether the last read or stream succeeded."""
+        return self.coordinator.last_update_success

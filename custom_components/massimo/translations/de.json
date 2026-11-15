@@ -106,6 +106,22 @@
       },
       "queued": {
         "name": "Wartende Befehle"
+      },
+      "last_contact": {
+        "name": "Letzter Kontakt"
+      },
+      "signed_in_as": {
+        "name": "Angemeldet als",
+        "state": {
+          "registered": "Registriert",
+          "user_key": "Schlüssel einer Person",
+          "no_users": "Server ohne Benutzer"
+        },
+        "state_attributes": {
+          "user": {
+            "name": "Benutzer"
+          }
+        }
       }
     },
     "switch": {

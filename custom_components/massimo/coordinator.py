@@ -196,6 +196,8 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
         self.integration: dict[str, Any] | None = None
         # The server's /me for the key: its user and mode.
         self.me: dict[str, Any] = {}
+        # When the server last answered a read, or sent an event.
+        self.last_contact: datetime | None = None
 
     @override
     async def _async_update_data(self) -> MassimoData:
@@ -214,6 +216,7 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
             raise UpdateFailed(str(err)) from err
         data = MassimoData(server, cubes)
         self._prune(data)
+        self.last_contact = dt_util.utcnow()
         return data
 
     def _configure(self, server: dict[str, Any]) -> None:
@@ -338,6 +341,7 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
     @callback
     def _apply(self, serial: str, event: StreamEvent) -> None:
         """Take an event into the data."""
+        self.last_contact = dt_util.utcnow()
         if event.kind == "open":
             if not self.last_update_success:
                 self.async_set_updated_data(self.data)
