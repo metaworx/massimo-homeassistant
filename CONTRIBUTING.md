@@ -52,6 +52,13 @@ MASSIMO_BIN=../massimo/massimo \
 The fake Cube serves Massimo's fixture `rooms`
 and carries out what it acknowledges;
 its control port sets a device's state as the device's report would.
+The fixture registers the tests' integration as an owner would,
+approving its request with the server's owner token,
+since Massimo gives the role `integration` only by registration;
+each test's Home Assistant has the installation id it registered from.
+A key typed by hand is an operator's.
+Massimo takes at most ten requests from an address in ten minutes,
+so a test that registers again counts against that.
 Without `MASSIMO_REQUIRED=1`,
 the tests that need a server are skipped where `MASSIMO_BIN` is missing;
 with it, as in CI, they fail.

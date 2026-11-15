@@ -18,8 +18,11 @@ beside Massimo's own web UI and apps.
 
 ## What it does so far
 
-- **Setup** by address, or found by mDNS (`_massimo._tcp`), with an API key.
+- **Setup** by address, or found by mDNS (`_massimo._tcp`),
+  registered by a code that Massimo's owner approves, or with an API key.
   The server is known by its node id, so a new address is followed.
+- **Users**: registered, each call names the Home Assistant user it is made
+  for, and Massimo allows it what that user may do ("Users", below).
 - **Live data**:
   it reads the server's Cubes and rooms once and then follows each Cube's event
   stream.
@@ -98,16 +101,12 @@ beside Massimo's own web UI and apps.
     Home Assistant, and carries none of them.
     A page holds one version of the editor: with two Massimo servers of
     different versions, the first one a card loads is used.
-- **Re-authentication** when the key stops working.
+- **Re-authentication** when the key stops working, and **reconfiguration**:
+  register again, or type another key.
 
 ## Setting up
 
-1. In Massimo, create a user with the role **integration** and an API key for
-   it: System settings → Users,
-   or on the server `massimo user add homeassistant -role integration`.
-   The role reads, sets temperatures, locks and configures (week programmes,
-   temperatures, device settings), and nothing else.
-2. Install it into Home Assistant's `custom_components/massimo` from the
+1. Install it into Home Assistant's `custom_components/massimo` from the
    channel you choose, with git or as a signed zip, as
    <https://ha.massimo.metaworx.ch> shows:
 
@@ -121,10 +120,49 @@ beside Massimo's own web UI and apps.
    `-alpha`, and `devel` is `main` once its tests have passed;
    until the first release, `devel` is the only one.
    (Through the Marketplace or HACS once released.)
-3. Settings → Devices & services → Add integration → **Massimo**:
-   the address at which a browser opens Massimo's web UI, and the key.
+2. Settings → Devices & services → Add integration → **Massimo**,
+   or the server Home Assistant found on the network:
+   the address at which a browser opens Massimo's web UI, then one of
+   - **Register**: Home Assistant asks Massimo to register it and shows a code.
+     In Massimo, System settings → Integrations lists the request with its code;
+     approve it there if the codes are the same, with the most it may do.
+     Home Assistant collects its key and goes on by itself.
+     A request waits ten minutes.
+   - **Type an API key** of a Massimo user who may read:
+     the way to a Massimo without the feature `integration`,
+     or one that takes no requests.
+     A server without users needs none.
 
 Home Assistant 2026.10 or newer.
+
+## Users
+
+Registered, Home Assistant is an integration of Massimo's,
+and each call it makes for one of its users names that user
+(Massimo's [docs/api-v1.md](https://github.com/metaworx/massimo/blob/main/docs/api-v1.md),
+"Acting for an integration's users"):
+
+- the user's id, name and level for the entity:
+  `admin` for an administrator, otherwise `control` where the user may
+  control the entity and `view` where only view;
+- a call no user started, such as an automation's, as `system`;
+- the reads and the event stream as the integration itself.
+
+Massimo makes each user at its first call, lists them under the integration,
+and lets you link one to a Massimo user; a call may do only what the
+integration, the user it is linked to, and the level allow.
+A refusal is said in Home Assistant with its reason.
+
+Two repairs may appear under Settings → Repairs:
+
+- **Register Home Assistant with Massimo**: the entry signs in with a key typed
+  by hand to a Massimo that could register it.
+  Reconfigure the entry and choose to register.
+- **Accept this installation in Massimo**: Massimo accepted another
+  installation of Home Assistant for this integration, as after a backup
+  restored on another machine.
+  Accept this one in Massimo, under System settings → Integrations;
+  until then, the calls made for users and automations are refused.
 
 ## Development
 

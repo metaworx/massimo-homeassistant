@@ -65,4 +65,4 @@ class TempMethod(RoomEntity, SelectEntity):
         rf = self.vwt.get("rf_address")
         if not rf:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="device_gone")
-        await self.write(self.coordinator.client.set_device_config(self.cube_serial, rf, {"temp_method": option}))
+        await self.write(lambda client: client.set_device_config(self.cube_serial, rf, {"temp_method": option}))

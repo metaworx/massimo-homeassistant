@@ -40,20 +40,35 @@ pytest_plugins = "pytest_homeassistant_custom_component"
 
 SERIAL = "KEQ0000100"
 
+# The installation id each test's Home Assistant has, the one the
+# integration registered from: 32 hex digits, as instance_id makes them.
+INSTANCE = "0123456789abcdef0123456789abcdef"
+
 
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
     """Every test may load the integration from custom_components."""
 
 
+@pytest.fixture(autouse=True)
+def installation_id(hass_storage: dict[str, object]) -> str:
+    """Every test's Home Assistant is the installation the fixture's
+    integration registered from."""
+    hass_storage["core.uuid"] = {"version": 1, "key": "core.uuid", "data": {"uuid": INSTANCE}}
+    return INSTANCE
+
+
 @dataclass(frozen=True)
 class Server:
-    """A running Massimo server: its address, the owner's token, and an API
-    key of a user with the role integration."""
+    """A running Massimo server: its address, the owner's token, the key of
+    an integration registered from INSTANCE (``integration`` its uuid), and
+    a key typed by hand, of an operator."""
 
     url: str
     owner: str
     key: str
+    integration: str
+    typed_key: str
     serial: str
     node_id: str
     port: int
@@ -70,10 +85,12 @@ def _wait_line(log: Path, pattern: str, what: str, seconds: float = 15) -> re.Ma
     raise RuntimeError(f"{what} did not start; its log:\n{log.read_text(errors='replace') if log.exists() else ''}")
 
 
-def http(method: str, url: str, token: str | None, body: object | None = None) -> object:
+def http(
+    method: str, url: str, token: str | None, body: object | None = None, headers: dict[str, str] | None = None
+) -> object:
     """A blocking request to the server, for the fixtures and the tests."""
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(url, data=data, method=method)
+    req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
     if token:
         req.add_header("Authorization", f"Bearer {token}")
     if data is not None:
@@ -171,11 +188,22 @@ def massimo_server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Server]
             if time.monotonic() > deadline:
                 raise RuntimeError(f"the server did not connect to the fake Cube; its log:\n{serve_log.read_text()}")
             time.sleep(0.2)
-        http("POST", url + "/api/v1/users", owner, {"name": "homeassistant", "role": "integration"})
-        made = http("POST", url + "/api/v1/users/homeassistant/tokens", owner, {"label": "tests"})
-        key = made.get("token") or made.get("secret")  # type: ignore[union-attr]
+        key, integration = register(url, owner, "homeassistant")
+        http("POST", url + "/api/v1/users", owner, {"name": "hand", "role": "operator"})
+        made = http("POST", url + "/api/v1/users/hand/tokens", owner, {"label": "tests"})
+        typed = made.get("token") or made.get("secret")  # type: ignore[union-attr]
         node = http("GET", url + "/healthz", None).get("node_id", "")  # type: ignore[union-attr]
-        yield Server(url=url, owner=owner, key=key, serial=SERIAL, node_id=node, port=port, control=f"http://{control}")
+        yield Server(
+            url=url,
+            owner=owner,
+            key=key,
+            integration=integration,
+            typed_key=typed,
+            serial=SERIAL,
+            node_id=node,
+            port=port,
+            control=f"http://{control}",
+        )
     finally:
         for p in procs:
             p.terminate()
@@ -184,6 +212,26 @@ def massimo_server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Server]
                 p.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 p.kill()
+
+
+def register(url: str, owner: str, name: str, instance: str = INSTANCE) -> tuple[str, str]:
+    """Registers an integration as the owner would, approving its request
+    (Massimo's docs/api-v1.md, "Integrations"): its key and its uuid."""
+    request = http(
+        "POST",
+        url + "/api/v1/integrations/requests",
+        None,
+        {"kind": "homeassistant", "name": name, "instance_id": instance, "url": "", "version": "test"},
+    )
+    uuid, code = request["id"], request["code"]  # type: ignore[index]
+    http("POST", f"{url}/api/v1/integrations/{uuid}/approve", owner, {})
+    collected = http("GET", f"{url}/api/v1/integrations/requests/{uuid}?code={code}", None)
+    return collected["key"], uuid  # type: ignore[index]
+
+
+def integration_users(server: Server) -> list[dict]:
+    """The registered integration's users, as Massimo lists them."""
+    return http("GET", f"{server.url}/api/v1/integrations/{server.integration}", server.owner)["users"]  # type: ignore[index]
 
 
 def rooms(server: Server) -> list[dict]:

@@ -7,6 +7,7 @@ on aiohttp alone, so that it can be tested without Home Assistant.
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import uuid
 from collections.abc import AsyncIterator
@@ -27,6 +28,28 @@ class MassimoConnectionError(MassimoError):
 
 class MassimoAuthError(MassimoError):
     """The API key is missing, wrong, revoked, or not allowed this."""
+
+
+class MassimoRefusedError(MassimoAuthError):
+    """Massimo refused a call of a registered integration, naming in
+    ``code`` the link of the chain that refused (Massimo's docs/api-v1.md,
+    "Acting for an integration's users"): bad_header, not_integration,
+    integration_disabled, instance_pending, user_disabled or forbidden."""
+
+    def __init__(self, message: str, code: str) -> None:
+        """Keep the refusal's code beside the message."""
+        super().__init__(message)
+        self.code = code
+
+
+class MassimoRegistrationOffError(MassimoError):
+    """The server takes no registration requests (its setting
+    integrations.requests), or too many came from this address."""
+
+
+class MassimoRegistrationGoneError(MassimoError):
+    """A registration request refused, expired, or its key collected and
+    used, or the code is not its own."""
 
 
 class MassimoDiscardedError(MassimoError):
@@ -73,6 +96,33 @@ class StreamEvent:
 DEVICES_REAL = "real"
 DEVICES_ALL = "all"
 
+# The header that names the user a registered integration's call acts for.
+ON_BEHALF = "X-MassimoHA-On-Behalf-Of"
+# The levels a call through an integration has, and the longest name
+# Massimo takes, in bytes.
+LEVEL_VIEW = "view"
+LEVEL_CONTROL = "control"
+LEVEL_ADMIN = "admin"
+SYSTEM = "system"
+NAME_BYTES = 128
+
+
+def on_behalf(
+    subject: str, level: str, instance: str, name: str | None = None, *, system_generated: bool = False
+) -> str:
+    """The header naming the user a call acts for: the user's id or
+    ``system``, the call's level, the installation id, and the user's name,
+    in RFC 8187's notation, so that any character passes, cut to what
+    Massimo takes."""
+    parts = [f"id={subject}", f"level={level}", f"instance={instance}"]
+    if name:
+        cut = name.encode()[:NAME_BYTES].decode(errors="ignore")
+        parts.append("name*=UTF-8''" + quote(cut, safe=""))
+    if system_generated:
+        parts.append("system_generated")
+    return "; ".join(parts)
+
+
 # A write waits for the Cube's answer, up to two minutes when the radio
 # budget is spent (Massimo's docs/api-v1.md, the setpoint routes).
 WRITE_TIMEOUT = 130
@@ -101,17 +151,38 @@ class MassimoClient:
         # devices to read, and whether a lost write may be sent again.
         self.devices = DEVICES_REAL
         self.retry_writes = True
+        self._on_behalf: str | None = None
+
+    def acting_for(self, header: str | None) -> MassimoClient:
+        """A client of the same server and key whose calls act for the
+        user the header names; this client itself without one."""
+        if not header:
+            return self
+        other = copy.copy(self)
+        other._on_behalf = header
+        return other
 
     def _headers(self, accept: str = "application/json") -> dict[str, str]:
         headers = {"Accept": accept}
         if self._key:
             headers["Authorization"] = f"Bearer {self._key}"
+        if self._on_behalf:
+            headers[ON_BEHALF] = self._on_behalf
         return headers
 
     @staticmethod
     async def _check(resp: aiohttp.ClientResponse) -> None:
-        if resp.status in (401, 403):
-            raise MassimoAuthError(f"{resp.status}: {(await resp.text()).strip()}")
+        if resp.status in (400, 401, 403):
+            text = (await resp.text()).strip()
+            try:
+                code = json.loads(text).get("code")
+            except ValueError, AttributeError:
+                code = None
+            if code and resp.status != 401:
+                raise MassimoRefusedError(f"{resp.status}: {text}", code)
+            if resp.status != 400:
+                raise MassimoAuthError(f"{resp.status}: {text}")
+            raise MassimoError(f"400: {text}")
         if resp.status == 412:
             text = (await resp.text()).strip()
             try:
@@ -172,8 +243,44 @@ class MassimoClient:
         return await self._get("/healthz")
 
     async def me(self) -> dict[str, Any]:
-        """Who the key is: the server's mode, the user, the capabilities."""
+        """Who the key is: the server's mode, the user, the capabilities;
+        ``integration``, the registered integration whose key it is, or
+        null; with the header, ``acts_for``."""
         return await self._get("/api/v1/me")
+
+    async def request_registration(self, name: str, instance_id: str, url: str, version: str) -> dict[str, Any]:
+        """Ask to be registered, without a key: the request's ``id``, the
+        ``code`` to show, and when it expires. The owner approves it in
+        Massimo."""
+        path = "/api/v1/integrations/requests"
+        body = {"kind": "homeassistant", "name": name, "instance_id": instance_id, "url": url, "version": version}
+        try:
+            async with self._session.post(
+                self.url + path, json=body, headers={"Accept": "application/json"}, timeout=self._timeout
+            ) as resp:
+                if resp.status in (403, 429):
+                    raise MassimoRegistrationOffError(f"{resp.status}: {(await resp.text()).strip()}")
+                await self._check(resp)
+                return await resp.json(content_type=None)
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise MassimoConnectionError(f"{path}: {err}") from err
+
+    async def collect_registration(self, request_id: str, code: str) -> dict[str, Any] | None:
+        """The key of an approved request, with its ``integration``; None
+        while the request waits."""
+        path = f"/api/v1/integrations/requests/{quote(request_id)}?code={quote(code)}"
+        try:
+            async with self._session.get(
+                self.url + path, headers={"Accept": "application/json"}, timeout=self._timeout
+            ) as resp:
+                if resp.status == 202:
+                    return None
+                if resp.status in (404, 410):
+                    raise MassimoRegistrationGoneError(f"{resp.status}: {(await resp.text()).strip()}")
+                await self._check(resp)
+                return await resp.json(content_type=None)
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise MassimoConnectionError(f"{path}: {err}") from err
 
     async def cubes(self) -> list[dict[str, Any]]:
         """The Cubes the server serves; those discovery merely found are
