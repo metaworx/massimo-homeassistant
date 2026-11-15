@@ -26,8 +26,11 @@ built from `main` of [metaworx/massimo](https://github.com/metaworx/massimo):
 
 ```bash
 git clone https://github.com/metaworx/massimo ../massimo
-(cd ../massimo && CGO_ENABLED=0 go build -o "$PWD/massimo" ./cmd/massimo)
+(cd ../massimo && make ui && CGO_ENABLED=0 go build -o "$PWD/massimo" ./cmd/massimo)
 ```
+
+`make ui` builds the web UI's bundle, which the server embeds and git does
+not keep.
 
 Where the checkout is on your machine goes in `GUIDELINES/config.local.ini`,
 which is not tracked:
