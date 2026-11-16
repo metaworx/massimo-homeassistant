@@ -11,6 +11,7 @@ name ``Massimo``.
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME
@@ -31,6 +32,14 @@ async def entry_title(hass: HomeAssistant, name: str, user: str | None, register
         return name
     texts = await async_get_translations(hass, hass.config.language, "exceptions", [DOMAIN])
     return texts.get(_KEY_OF, "{name} (key of {user})").replace("{name}", name).replace("{user}", user)
+
+
+def key_user(me: dict[str, Any]) -> str | None:
+    """Whose key it is, from ``GET /api/v1/me``: the user's display name,
+    its login name where it has none. An integration's users are named
+    ``<integration uuid>:<subject>``, which says nothing to a person."""
+    user = me.get("user") or {}
+    return user.get("display_name") or user.get("name")
 
 
 def entry_name(entry: ConfigEntry) -> str:

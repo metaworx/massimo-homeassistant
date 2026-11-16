@@ -11,7 +11,8 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.massimo.const import CONF_AUTO_TITLE, CONF_REGISTERED, DOMAIN
 
-from .conftest import Server
+from .conftest import Server, http
+from .test_entities import _entity
 
 
 async def _set_up(hass: HomeAssistant, server: Server, key: str, title: str, **data: Any) -> MockConfigEntry:
@@ -88,4 +89,24 @@ async def test_the_title_in_home_assistants_language(
     hass.config.language = "de"
     entry = await _set_up(hass, massimo_server, massimo_server.typed_key, "Massimo")
     assert entry.title == "Massimo (Schlüssel von hand)"
+    await _unload(hass, entry)
+
+
+async def test_the_title_names_the_user_by_display_name(
+    hass: HomeAssistant, massimo_server: Server, socket_enabled: None
+) -> None:
+    """Whose key it is, by the user's display name; by its login name where
+    it has none, as an integration's users are named by a uuid."""
+    user = f"{massimo_server.url}/api/v1/users/hand"
+    http("PUT", user, massimo_server.owner, {"display_name": "Hand Werker"})
+    try:
+        entry = await _set_up(hass, massimo_server, massimo_server.typed_key, "Massimo")
+        assert entry.title == "Massimo (key of Hand Werker)"
+        state = hass.states.get(_entity(hass, "sensor", f"{massimo_server.node_id or massimo_server.url}_signed_in_as"))
+        assert state is not None and state.attributes["user"] == "Hand Werker"
+        await _unload(hass, entry)
+    finally:
+        http("PUT", user, massimo_server.owner, {"display_name": ""})
+    entry = await _set_up(hass, massimo_server, massimo_server.typed_key, "Massimo")
+    assert entry.title == "Massimo (key of hand)"
     await _unload(hass, entry)
