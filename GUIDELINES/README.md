@@ -20,8 +20,8 @@ cd massimo-homeassistant
 uv python install 3.14
 uv venv --python-preference only-managed --python 3.14 .venv
 VIRTUAL_ENV=.venv uv pip install -r requirements_test.txt
-# a massimo binary, built from Massimo's main:
-(cd ../massimo && go build -o /tmp/massimo ./cmd/massimo)
+# a massimo binary, built from Massimo's release/devel:
+(cd ../massimo && make ui && go build -o /tmp/massimo ./cmd/massimo)
 MASSIMO_REQUIRED=1 MASSIMO_BIN=/tmp/massimo .venv/bin/python -m pytest
 ```
 
@@ -49,7 +49,7 @@ Editing a generated file is wasted work — change the fragment and re-run
 ---
 
 
-# Massimo for Home Assistant — Project Contract (v1.2.0)
+# Massimo for Home Assistant — Project Contract (v1.3.0)
 
 What binds work in this project, for everyone working on it.
 Inlined into `/AGENTS.md` for agents and into `GUIDELINES/README.md` for people,
@@ -75,7 +75,7 @@ so that the two cannot drift apart.
 | Source directories    | `custom_components/massimo/` (the integration: `api.py` the client of Massimo's API, `config_flow.py`, `coordinator.py`, the platforms to come, `translations/`), `tests/` (pytest against a real Massimo server), `tools/` (`dist.py`: a release's version, channel, zip and distro commits), `site/` (the site, `ha.massimo.metaworx.ch`), `keys/` (the public keys that sign), `.github/workflows/` (CI, the release, the site) |
 | Shipped-code paths    | declared as `project.shipped` in `GUIDELINES/config.ini` and listed below; kept honest by `GUIDELINES/shared/tools/changelog.sh check` (rule: `GUIDELINES/shared/COMMIT.md` §5) |
 | Version manifest      | `custom_components/massimo/manifest.json`, its `version`, which `changelog.sh cut` writes; a release is a signed tag `v<version>`, from which CI makes the GitHub release with the signed zip and writes the `distro/<channel>` branches (`CONTRIBUTING.md`, "Releases and channels") |
-| Test gate command     | `MASSIMO_REQUIRED=1 MASSIMO_BIN=<massimo> .venv/bin/python -m pytest` against a `massimo` built from Massimo's `main` (where its checkout is on this machine: `GUIDELINES/config.local.ini`, section `[massimo]`); then hassfest: `docker run --rm -v "$PWD":/github/workspace ghcr.io/home-assistant/hassfest`; CI runs both, and HACS's validation |
+| Test gate command     | `MASSIMO_REQUIRED=1 MASSIMO_BIN=<massimo> .venv/bin/python -m pytest` against a `massimo` built from Massimo's `release/devel` (where its checkout is on this machine: `GUIDELINES/config.local.ini`, section `[massimo]`); then hassfest: `docker run --rm -v "$PWD":/github/workspace ghcr.io/home-assistant/hassfest`; CI runs both, against each of Massimo's release channels, and HACS's validation |
 | Lint command          | `ruff check custom_components tests tools` and `ruff format --check custom_components tests tools` print nothing to fix, with the settings of `pyproject.toml` (ruff 0.17.4, as CI pins it) |
 | Commit summary        | declared as `[commit]` in `GUIDELINES/config.ini` and shown below; held to it by `GUIDELINES/shared/tools/commit-msg.sh` (rule: `GUIDELINES/shared/COMMIT.md` §3.1) |
 
