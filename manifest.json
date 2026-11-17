@@ -10,6 +10,6 @@
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/metaworx/massimo-homeassistant/issues",
   "requirements": [],
-  "version": "0.0.0-dev.70+g6b2b6bb",
+  "version": "0.0.0-dev.74+gbe6ef28",
   "zeroconf": ["_massimo._tcp.local."]
 }
