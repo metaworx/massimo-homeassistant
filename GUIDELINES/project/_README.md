@@ -16,8 +16,8 @@ cd massimo-homeassistant
 uv python install 3.14
 uv venv --python-preference only-managed --python 3.14 .venv
 VIRTUAL_ENV=.venv uv pip install -r requirements_test.txt
-# a massimo binary, built from Massimo's main:
-(cd ../massimo && go build -o /tmp/massimo ./cmd/massimo)
+# a massimo binary, built from Massimo's release/devel:
+(cd ../massimo && make ui && go build -o /tmp/massimo ./cmd/massimo)
 MASSIMO_REQUIRED=1 MASSIMO_BIN=/tmp/massimo .venv/bin/python -m pytest
 ```
 

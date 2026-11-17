@@ -1,7 +1,8 @@
 # The integration's checks: Home Assistant's hassfest and HACS's
 # validation, ruff, and the tests against a real Massimo server built from
-# metaworx/massimo (main, or the ref given to a manual run; a version tag's
-# run also against Massimo's newest release). A push of main or of a version
+# metaworx/massimo: each of its release channels, the branches and tags
+# under release/ but release/nightly (AP ServerCompat, D1-A), or the ref
+# given to a manual run. A push of main or of a version
 # tag that passes them all is released by release.yml: main as the channel
 # devel, a tag as its version (CONTRIBUTING.md, "Releases and channels").
 name: CI
@@ -14,8 +15,8 @@ on:
   workflow_dispatch:
     inputs:
       massimo_ref:
-        description: Massimo's branch, tag or commit to test against
-        default: main
+        description: Massimo's branch, tag or commit to test against; empty for its release channels
+        default: ''
 
 permissions:
   contents: read
@@ -51,9 +52,11 @@ jobs:
       - run: ruff check custom_components tests tools
       - run: ruff format --check custom_components tests tools
 
-  # Which Massimo the tests run against: main, or the ref of a manual run;
-  # for a version tag also Massimo's newest version tag with a release, so
-  # that a release here works with a Massimo one can install.
+  # Which Massimo the tests run against: each of Massimo's release
+  # channels a box can run - release/devel (its main after CI), and
+  # release/alpha, beta and stable as they come - by commit, a tag by the
+  # commit it points at, two names on one commit one entry; release/nightly
+  # left out (D3-A). A manual run's ref instead, where it names one.
   massimo:
     name: Which Massimo
     runs-on: ubuntu-latest
@@ -62,24 +65,28 @@ jobs:
     steps:
       - id: refs
         env:
-          GH_TOKEN: ${{ github.token }}
-          REF: ${{ inputs.massimo_ref || 'main' }}
-          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          REF: ${{ inputs.massimo_ref }}
         run: |
-          refs="[\"$REF\"]"
-          if [ "$IS_TAG" = true ]; then
-            newest=$(gh release list -R metaworx/massimo --exclude-drafts --limit 50 --json tagName \
-              --jq '[.[].tagName | select(startswith("v"))][0] // ""')
-            if [ -z "$newest" ]; then
-              echo "::error::Massimo has no release to test against."
-              exit 1
-            fi
-            refs="[\"$REF\", \"$newest\"]"
+          if [ -n "$REF" ]; then
+            refs=$(jq -cn --arg ref "$REF" '[{label: $ref, ref: $ref}]')
+          else
+            refs=$(git ls-remote https://github.com/metaworx/massimo 'refs/heads/release/*' 'refs/tags/release/*' |
+              jq -R -s -c '
+                [split("\n")[] | select(length > 0) | split("\t") | {sha: .[0], ref: .[1]}
+                 | .peeled = (.ref | endswith("^{}"))
+                 | .name = (.ref | sub("\\^\\{\\}$"; "") | sub("^refs/(heads|tags)/"; ""))
+                 | select(.name != "release/nightly")]
+                | group_by(.name) | map(max_by(.peeled) | {name, sha})
+                | group_by(.sha) | map({label: (map(.name) | sort | join(", ")), ref: .[0].sha})')
+          fi
+          if [ "$refs" = "[]" ]; then
+            echo "::error::Massimo has no release channel to test against."
+            exit 1
           fi
           echo "refs=$refs" | tee -a "$GITHUB_OUTPUT"
 
   test:
-    name: Tests against Massimo ${{ matrix.massimo }}
+    name: Tests against Massimo ${{ matrix.massimo.label }}
     needs: massimo
     runs-on: ubuntu-latest
     strategy:
@@ -91,7 +98,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: metaworx/massimo
-          ref: ${{ matrix.massimo }}
+          ref: ${{ matrix.massimo.ref }}
           path: massimo
           submodules: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -119,12 +126,26 @@ jobs:
           MASSIMO_REQUIRED: "1"
         run: MASSIMO_BIN="$RUNNER_TEMP/massimo" python -m pytest -v -rs
 
+  # The one check the ruleset on main requires, whatever the matrix holds:
+  # every entry of the test job passed (D5-A).
+  tests:
+    name: Tests passed against Massimo
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          RESULT: ${{ needs.test.result }}
+        run: |
+          echo "the tests against Massimo: $RESULT"
+          [ "$RESULT" = success ]
+
   # A push of main or of a version tag, every check passed: released.
   # secrets: inherit, or the called workflow sees no secret, not even its
   # environment's.
   release:
     name: Release
-    needs: [hassfest, hacs, lint, test]
+    needs: [hassfest, hacs, lint, tests]
     if: github.event_name == 'push'
     permissions:
       contents: write

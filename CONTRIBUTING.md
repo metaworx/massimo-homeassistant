@@ -22,12 +22,17 @@ a plain `uv venv --python 3.14` can take the Windows Python and make a Windows
 venv.
 
 The tests need a `massimo` binary,
-built from `main` of [metaworx/massimo](https://github.com/metaworx/massimo):
+built from `release/devel` of [metaworx/massimo](https://github.com/metaworx/massimo),
+its `main` once its CI passed:
 
 ```bash
-git clone https://github.com/metaworx/massimo ../massimo
+git clone --branch release/devel https://github.com/metaworx/massimo ../massimo
 (cd ../massimo && make ui && CGO_ENABLED=0 go build -o "$PWD/massimo" ./cmd/massimo)
 ```
+
+`release/devel` is a tag Massimo moves with each devel build; an existing
+checkout takes the newest with
+`git -C ../massimo fetch --force --tags && git -C ../massimo switch --detach release/devel`.
 
 `make ui` builds the web UI's bundle, which the server embeds and git does
 not keep.
@@ -65,10 +70,12 @@ so a test that registers again counts against that.
 Without `MASSIMO_REQUIRED=1`,
 the tests that need a server are skipped where `MASSIMO_BIN` is missing;
 with it, as in CI, they fail.
-CI builds `massimo` from Massimo's `main`,
-or from the branch, tag or commit a manual run names,
-so a change that needs something new in Massimo waits until Massimo has it on
-`main`.
+CI builds `massimo` from each of Massimo's release channels -
+every branch and tag under `release/` but `release/nightly`,
+one job per commit - or from the branch, tag or commit a manual run names;
+"Tests passed against Massimo" is the check that sums them up.
+So a change that needs something new in Massimo waits until Massimo's
+devel build has it, and skips it where an older channel has not.
 
 Then Home Assistant's own check of the integration:
 
@@ -224,7 +231,7 @@ until it is given `--force`.
    Then `changelog.sh tag X.Y.Z --push --force` publishes the tag and nothing
    else.
 4. **Approve the release.**
-   The tag's run tests against Massimo's `main` and its newest release,
+   The tag's run tests against Massimo's release channels,
    then waits in the environment `signing` for the owner's approval;
    approved, it makes the GitHub release, writes the `distro/*` branches
    and deploys the site.
