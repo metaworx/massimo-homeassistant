@@ -52,7 +52,7 @@ from .api import (
 )
 from .const import CONF_ANNOUNCED, CONF_AUTO_TITLE, CONF_REGISTERED, CONF_REGISTRATION_NAME, DOMAIN, LOGGER
 from .coordinator import has_feature
-from .title import entry_name, entry_title, title_is_automatic
+from .title import entry_name, entry_title, key_user, title_is_automatic
 
 # What the integration needs at least: reading. Setpoints and week
 # programmes need setpoint and configure, which the role integration has.
@@ -140,7 +140,7 @@ class MassimoConfigFlow(ConfigFlow, domain=DOMAIN):
         if me.get("mode") == "users" and REQUIRED_CAPABILITY not in me.get("capabilities", []):
             raise MassimoAuthError("the key may not read")
         node = health.get("node_id") or self.url
-        return node, (me.get("user") or {}).get("name"), me.get("integration") is not None
+        return node, key_user(me), me.get("integration") is not None
 
     def _placeholders(self) -> dict[str, str]:
         return {"url": self.url, "name": self.name or self.url}

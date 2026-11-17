@@ -65,7 +65,7 @@ from .const import (
     REFRESH_KINDS,
     THERMOSTATS,
 )
-from .title import entry_name, entry_title, title_is_automatic
+from .title import entry_name, entry_title, key_user, title_is_automatic
 
 type MassimoConfigEntry = ConfigEntry[MassimoCoordinator]
 
@@ -262,7 +262,7 @@ class MassimoCoordinator(DataUpdateCoordinator[MassimoData]):
         title = entry.title
         if title_is_automatic(entry):
             name = entry_name(entry)
-            user = (self.me.get("user") or {}).get("name")
+            user = key_user(self.me)
             title = await entry_title(self.hass, name, user, registered)
             data |= {CONF_NAME: name, CONF_AUTO_TITLE: title}
         if title != entry.title or data != entry.data:

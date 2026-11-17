@@ -21,6 +21,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .const import RADIATOR_THERMOSTATS, THERMOSTATS
 from .coordinator import MassimoConfigEntry
 from .entity import CubeEntity, DeviceEntity, ServerEntity, add_entities_as_they_come, devices_of
+from .title import key_user
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -188,4 +189,4 @@ class SignedInAs(ServerEntity, SensorEntity):
         """The key's person, where it is one's."""
         if self.native_value != "user_key":
             return {}
-        return {"user": (self.coordinator.me.get("user") or {}).get("name")}
+        return {"user": key_user(self.coordinator.me)}
