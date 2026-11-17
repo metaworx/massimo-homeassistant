@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import secrets
+from urllib.parse import quote
 
 import aiohttp
 import pytest
@@ -223,8 +224,12 @@ async def test_a_write_lost_on_its_way_back_is_retried_once(massimo_server: Serv
     srv = massimo_server
     rf = next(d["rf_address"] for r in rooms(srv) for d in r.get("devices") or [] if "thermostat" in d["type"])
 
+    # The integration's own user, by the name Massimo gives it: its own
+    # (homeassistant) before Massimo's migration 0024, "<uuid>:" since.
+    user = quote(http("GET", f"{srv.url}/api/v1/me", srv.key)["user"]["name"])  # type: ignore[index]
+
     def locks() -> int:
-        rows = http("GET", f"{srv.url}/api/v1/audit?user=homeassistant&limit=50", srv.owner)
+        rows = http("GET", f"{srv.url}/api/v1/audit?user={user}&limit=50", srv.owner)
         return sum(r["action"] == "device.lock" for r in rows)  # type: ignore[union-attr]
 
     before = locks()
