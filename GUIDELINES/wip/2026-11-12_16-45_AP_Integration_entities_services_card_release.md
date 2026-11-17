@@ -1,4 +1,4 @@
-# AP Integration v1.7: Entities, services, card, release
+# AP Integration v1.8: Entities, services, card, release
 
 ## TL;DR
 
@@ -7,20 +7,17 @@ Massimo's room thermostat, is released through the Marketplace,
 and replaces `maxcube` on breno.
 Each block requires the Massimo feature it uses, by name, from `/healthz`.
 
-- devices, rooms, boost, programmes, brand images, card → done (1-7)
-- read access → `get_program` needs `control` (an entity service) →
-  a service of the integration checking `read`: a view-only user reads
-  the programme, the card included; `copy_program` reads its source only
-  where the user may
-- users to Massimo → not here: waits for Massimo's `integration` feature
-- distribution → a GitHub release by hand → CI: signed zip, SSH-signed
-  `distro/<channel>` branches for git, the zips on `ha.massimo.metaworx.ch`
-- channels: stable; beta (every 0.x, and `-beta`); alpha (`-alpha`);
-  devel (`main` after its tests; no GitHub release)
-- keys: release and rolling, made in `~/.ssh`, piped to `gh` (D46)
-- breno → `maxcube` (not loaded since 2026-11-12) → the integration from
-  `distro/devel`, before the first release
-- release → 0.1.0, beta, a pre-release; Marketplace and HACS
+- devices, rooms, boost, programmes, brand images, card, distribution,
+  read access → done (1-9)
+- users to Massimo → built under a plan of its own (#14): registration,
+  the user and level on each call, `system` for a call without one
+- setup → reread when opened, two names, a typed address kept, titles by
+  the key's display name, the server as a device (#15, #16)
+- breno trial → resumed 2026-11-15: `distro/devel` on the Pi, registered;
+  the checks of step 3 open
+- release → 0.1.0, beta, a pre-release; Massimo v0.16.0-alpha.1 has
+  `features` and the suite passes against it
+- the NOTEs of v1.2 to v1.7 → folded in, at the owner's word
 
 ### Blocks
 
@@ -31,9 +28,9 @@ Each block requires the Massimo feature it uses, by name, from `/healthz`.
 5. Programmes: get, set, copy with the ETag, `program_changed` - done
 6. Brand images - done
 7. Card - done
-8. Distribution: `dist.py`, the release workflow, `distro/*`, keys, site
-9. Read access: `get_program` for a view-only user, `copy_program`'s source
-10. Breno trial: the integration from `distro/devel` on the Pi
+8. Distribution: `dist.py`, the release workflow, `distro/*`, keys, site - done
+9. Read access: `get_program` for a view-only user, `copy_program`'s source - done
+10. Breno trial: the integration from `distro/devel` on the Pi - steps 1 and 2 done
 11. First release: 0.1.0, category, topics, the zip for HACS
 12. Breno: `maxcube` removed, the box's documentation
 
@@ -54,7 +51,7 @@ the card uses Massimo's own editor element, plain JavaScript, no build step,
 with a kit of Home Assistant's controls;
 Apache-2.0; the repository is public.
 
-**Decided at this plan's gates (2026-11-12 and 13):**
+**Decided at this plan's gates (2026-11-12 to 14):**
 
 - **D1-C.**
   A room's temperature: its wall thermostat's, else the median of its
@@ -187,33 +184,61 @@ Apache-2.0; the repository is public.
 - **D55-B** (the owner, 2026-11-14), for the plan that passes users on:
   a call without a user (an automation, a script, the system) names the
   fixed user `system`.
-- **D56** (the owner, 2026-11-14).
-  Read access is Block 9, after Block 8 of v1.6; the trial, the release and
-  breno move down to 10 to 12.
+- **D56, as since built** (the owner, 2026-11-14).
+  Read access is Block 9, after Block 8; the trial, the release and breno
+  move down to 10 to 12.
   Passing the Home Assistant user on to Massimo - its id and name, and the
   call's access level, `admin`, `control` or `view` for the call's target -
-  is not this plan's: it waits for Massimo's `integration` feature on
-  Massimo's `main`, and is built as Massimo specifies it, under a plan of
-  its own.
-- **D57-B** (the owner, 2026-11-14).
-  Nothing is asked of Massimo for it yet.
+  was not this plan's: it waited for Massimo's `integration` feature and was
+  built as Massimo specifies it, under a plan of its own, merged as #14
+  (2026-11-15).
+- **D57, superseded** (2026-11-14). D57-B, "nothing is asked of Massimo for
+  it yet", no longer held once the owner asked: the session
+  "HA Integration 1" briefed Massimo's session "Windhager Webserver 2" on
+  the feature `integration: 1.0`, which Massimo then built.
+- **D58-A** (the owner, 2026-11-14).
+  A ruleset on `main` requires CI's checks before a merge:
+  hassfest, HACS, ruff and "Tests against Massimo main"; a repository admin
+  may bypass it. As Massimo's "main: checks before merge"; made.
+- **D59-A** (the owner, 2026-11-14).
+  A release signs its `SHA256SUMS` too, with the zip's key:
+  `SHA256SUMS.sig` beside it, one check for every file a release carries.
+- **D60-A** (the owner, 2026-11-14).
+  actionlint comes from the guidelines: `GUIDELINES/shared/tools/actionlint.sh`,
+  one pinned version, from its Docker image or as a checked binary;
+  the guidelines carry it since #12. CI does not run it yet.
+- **D61-A** (the owner, 2026-11-14).
+  The warnings Home Assistant 2026.11 gives on `climate.py` are fixed before
+  the first release, on a branch of their own, with a test: merged as #13.
+- **D62-A** (the owner, 2026-11-14).
+  The clone of `distro/devel` on the Pi stays; a `git pull` brings it up to
+  date when the trial goes on.
 - **Areas.**
   Every device suggests its room's name as its area, once;
   the areas stay the owner's.
 - **Never half-way** (the owner, 2026-11-13).
   A step that needs Massimo waits until Massimo has it on its `main`,
   and is then built as Massimo specifies.
+- **The NOTEs folded** (the owner, 2026-11-17).
+  v1.8 takes in every NOTE of v1.2 to v1.7, those recording how a run went
+  among them, and the work of the plans that passed users on (#14) and
+  polished the setup (#15, #16), so that the plan reads alone.
 
 ## Analysis
 
 **What a server supports** (Massimo's `docs/api-v1.md`, `GET /healthz`):
 `features` names `event_ids`, `idempotency`, `commands`, `vwt`,
-`program_etag`, `boost`, `proxy_virtual`, each `"1.0"` today;
-a server without a store leaves out `idempotency`, `commands` and
-`proxy_virtual`; a server without the field has none.
+`program_etag`, `boost`, `proxy_virtual` and `integration`, each `"1.0"`;
+a server without a store leaves out `idempotency`, `commands`,
+`proxy_virtual` and `integration`; a server without the field has none.
+`vwt`, `program_etag`, `boost`, `proxy_virtual` and `integration` are first in
+v0.16.0-alpha.1, Massimo's newest release (2026-11-15).
 The coordinator reads it with the health it already reads.
-A block's entities need its feature's major 1;
+A block's entities need its feature's major 1, and a feature of another
+major counts as absent;
 the client retries a lost write only where `idempotency` is listed.
+The suite passes against v0.16.0-alpha.1 (89 tests, 2026-11-17); it cannot
+run against an older Massimo, its setup registering an integration.
 
 **Rooms** (`?devices=all`, measured on the fake Cube's fixture `rooms`):
 each room carries `room_uid`, and lists its VWT first among its devices -
@@ -236,6 +261,9 @@ settings and sends a `config` event with `changed: ["settings"]`.
 The event stream with `?devices=all` sends the VWT's `state` and `config`
 events.
 The real devices' entities leave the VWTs out by `virtual`.
+Massimo's default view adds a virtual wall thermostat to each room without a
+real one; the integration and the tests' own reads use `?devices=real`
+where they want the real devices.
 
 **Home Assistant's climate** (2026.10):
 `HVACMode` `auto`, `heat`, `off`; `HVACAction` `heating`, `idle`, `off`;
@@ -245,6 +273,27 @@ presets `eco`, `comfort`, `away`, `boost`, `none`;
 An entity service is registered on the platform with a `probatio` schema,
 as core's climate integrations do.
 
+**Home Assistant 2026.11** (checked by its source on 2026-11-13, and on the
+Pi's 2026.11.0):
+
+- climate names its temperatures `native_*` and warns of an entity giving
+  an old name alone, which stops working in 2027.11; 2026.10 reads only the
+  old names. Given both, 2026.11 takes the native ones without a warning
+  (`migrate_deprecated_entity_members`): `RoomClimate` gives both (D61-A).
+- A device naming its Cube by identifier (`via_device`) is deprecated since
+  2026.10 and goes in 2027.8: devices, and the Cubes their server, are named
+  by device id (`via_device_id`).
+- `async_setup_entry` returns `True` while the integration supports 2026.10,
+  which fails a setup returning anything but a boolean; `None` once it
+  requires 2026.11, which ignores a boolean from a custom integration.
+- `DeviceInfo` is a dataclass in 2026.11; the integration builds it with
+  keyword arguments only, which both versions take.
+- Nothing else the integration imports changed in a way it uses;
+  2026.11's opt-in to changing an entity's id in place is not taken.
+- The tests cannot run on 2026.11 yet: `pytest-homeassistant-custom-component`
+  0.13.375 is for 2026.10.4, and with 2026.11 in its place the harness does
+  not load (it imports `httpx` before Home Assistant, which 2026.11 refuses).
+
 **Brand images** (Home Assistant 2026.10, `homeassistant/components/brands`):
 a custom integration's `brand/` holds `icon.png`, `logo.png`, their `@2x`
 and their `dark_` ones; a missing one falls back (`logo` to `icon`, `dark_` to
@@ -253,10 +302,6 @@ loader says `has_branding` where `brand/` is there.
 Its code checks the names, not the sizes; the brand rules ask for an icon of
 1:1 at 256 px (512 at `@2x`), a logo whose short side is 128 to 256 px,
 transparent, trimmed.
-Massimo's tool writes them from its drawing; its images of #215 keep a
-margin (13 px left and right, 22 px top and bottom of the icon at 256 px).
-Its v1.1.0, on the branch `claude/web-brand` of Massimo's AP WebBrand, adds
-the web UI's files and leaves the others' bytes as they were.
 
 **The card's element** (Massimo's `internal/server/ui/week-program.js`,
 AGPL-3.0-or-later): a classic script defining `<massimo-week-program>`,
@@ -275,8 +320,6 @@ Its look is the class names Massimo's AGPL `style.css` styles
 (`day-bar`, `prog-bar`, `prog-seg` with `--warm`, `prog-point`, `step`,
 `muted`, `small`): the card has CSS of its own for them, in Home Assistant's
 theme variables.
-Massimo's page sends the changed days with the tag, and on `412` keeps the
-edits and offers a reload (`config.js`, `sendProgram`).
 Home Assistant 2026.10 loads a script on every page with
 `frontend.add_extra_js_url`, serves files with
 `http.async_register_static_paths`, and signs a card's fetch with
@@ -300,12 +343,26 @@ Home Assistant 2026.10 loads a script on every page with
   `distro/*` branches, on every deploy.
 - **Rulesets** let a deploy key through as a bypass actor, as Massimo's
   `release/*` branches do; GitHub's own token is not one.
-- **The Pi** (`pi.breno.caleon.ch`): Home Assistant 2026.11.0, the container
-  `homeassistant` (`ghcr.io/home-assistant/home-assistant:stable`) on the
-  host network, `/srv/homeassistant/config` as `/config`, owned by root;
-  git there; Massimo `v0.15.0-alpha.1-153-g1b3a9a1` as a service, with
-  `features`; `maxcube` failed its setup on 2026-11-12 (the proxy refused)
-  and has not run since.
+- **`git verify-commit`** takes any key of `allowed_signers`, whoever the
+  committer: `site/build.sh` also checks that the principal is the channel's
+  (release, or rolling for devel).
+- **A called workflow** sees no secret, not even its environment's, unless
+  the caller passes `secrets: inherit`, as `ci.yml` does for `release.yml`.
+
+**The Pi** (`pi.breno.caleon.ch`, 2026-11-15):
+Home Assistant 2026.11.0, the container `homeassistant`
+(`ghcr.io/home-assistant/home-assistant:stable`) on the host network,
+`/srv/homeassistant/config` as `/config`;
+the integration a clone of `distro/devel` owned by `pi` at
+`/srv/homeassistant/config/custom_components/massimo`, its commits checked
+against the clone's `.git/allowed_signers`; updated by
+`git -C /srv/homeassistant/config/custom_components/massimo pull` and
+`sudo docker restart homeassistant`.
+Its Massimo, a service, announces itself with the record's `url`
+`https://massimo.breno.caleon.ch`; Home Assistant is registered with it.
+A second Massimo on the LAN, on the owner's workstation, is discovered too.
+`maxcube` failed its setup on 2026-11-12 (the proxy refused) and has not
+run since.
 
 **Permissions** (Home Assistant 2026.10, its `helpers/service.py` and
 `auth/permissions`):
@@ -318,8 +375,6 @@ a service of the integration checks what it needs itself, from
 `call.context.user_id`, and a call without one is the system's.
 The WebSocket's `call_service` merges its `target` into the call's data,
 so the card's call reaches either kind unchanged.
-The context of a call is set on the entity before the service runs,
-so a write can tell whose it is: the later plan's starting point.
 
 **Tests** run on Massimo's fixture `rooms`:
 room 1 "Wohnen", a wall thermostat at 21.4 °C and two radiator thermostats;
@@ -329,6 +384,11 @@ The fake Cube carries out what it acknowledges;
 its control port sets a device's state, removes a device from its room and
 restores it, and drops the connection;
 `-boost-for` shortens a boost.
+Massimo's server embeds a web UI bundle that git does not keep: CI, and a
+local build, run Massimo's bundler first where Massimo has one.
+Since Massimo's AP StoreRaise, an integration's users are named
+`<integration uuid>:<subject>`: the tests find them by the names Massimo
+gives, never by a name written in.
 
 ## Implementation Plan
 
@@ -336,8 +396,11 @@ restores it, and drops the connection;
 
 Merged as #2, #3 and #4: the Cube as a hub, a device per real device in its
 room's area, sensors, binary sensors, a key-lock switch, availability;
-writes with an `Idempotency-Key`; tests on the fixture `rooms`;
-a device names its Cube by its device id.
+writes with an `Idempotency-Key`; a device names its Cube by its device id.
+The tests start the fake Cube on Massimo's fixture `rooms` with its control
+port, not on a recorded greeting (`MASSIMO_GREETING` no longer read), and
+cover a wall thermostat, the key lock as reported, a report reaching its
+sensor, and a device without state unavailable until it reports.
 
 ### Block 2: Release mechanics - done
 
@@ -346,218 +409,102 @@ Merged as #2: `changelog.sh cut` writes `manifest.json`'s `version`;
 
 ### Block 3: Rooms - done
 
-Merged as #5, as NOTE v1.3 "how blocks 3 and 4 went" records.
+Merged as #5: features kept by the coordinator, `?devices=all` with `vwt`;
+a device per room with a thermostat, its `climate` (modes, presets, the
+attributes), `massimo.set_vacation`, `temp_method` as a `select`, translated
+refusals, texts and icons, tests on the fixture.
+Where it differs from the steps v1.3 gave:
 
-1. **Features:** the coordinator keeps the server's `features`;
-   the client retries a lost write only where `idempotency` is listed.
-2. **The data:** with `vwt` 1.x, rooms and the stream ask for
-   `?devices=all`, and each room's VWT details (`GET …/devices/{vwt}`) are
-   read with the rooms; without it, `?devices=real`, no rooms, and a warning
-   once that the rooms need a newer Massimo.
-   The device entities of Block 1 leave out `virtual` devices.
-3. **Room devices:** a device per room, `(massimo, "<cube>:<room_uid>")`,
-   named as the room, model "Room", the VWT's serial,
-   beneath its Cube, its area suggested by its name;
-   it leaves the registry with its room.
-4. **`climate` per room with a thermostat:** current temperature, target,
-   step 0.5, the room's `min_setpoint` to `max_setpoint`;
-   modes `auto` (auto), `heat` (manual, or vacation and boost),
-   `off` (manual at the minimum);
-   `hvac_action` heating while a valve is open, idle, off;
-   presets `eco` and `comfort` (manual at the room's temperatures),
-   `away` while in vacation, `none` (back to the week programme);
-   `away` chosen in the dialog is refused, naming `set_vacation`;
-   attributes `consistent`, `temperature_sources` (the devices' names),
-   `vacation_until`, `pending` (the Cube's radiograms waiting).
-5. **`massimo.set_vacation`** on a room's `climate`:
-   a temperature and an end, rounded up to the half hour,
-   refused in the past.
-6. **`temp_method`** as a configuration `select` on a room's device:
-   `median` or `mean`.
-7. **Writes** through the VWT's routes; a refused write raises a translated
-   error.
-8. **Texts and icons**, `services.yaml`.
-9. **Tests** on the fixture: room devices for all three rooms and a
-   `climate` for two; the wall thermostat's temperature and the median;
-   a setpoint, `off`, `auto`, the presets, vacation, `away` refused;
-   `temp_method` `mean`; a wall thermostat removed and restored with the
-   room's device unchanged; a server without `vwt`.
-10. **CHANGELOG fragment** under `Added`.
-
-**Verification:**
-the test gate and lint of the contract; hassfest.
+- A room gets a device only where it has a thermostat: Home Assistant
+  registers a device through its entities, and a room without one has
+  nothing to control. A room that loses its last thermostat keeps its device,
+  its `climate` unavailable.
+- `off` holds 4.5 °C, MAX!'s off, not the room's minimum setpoint.
+- The tests find rooms by id, not by name.
 
 ### Block 4: Boost - done
 
-Merged as #5.
-
-1. The preset `boost` where `boost` 1.x is listed: `{"mode": "boost"}`;
-   shown while any thermostat of the room boosts.
-2. Tests with the fake Cube's `-boost-for`: the boost and its return.
-3. CHANGELOG fragment.
-
-**Verification:**
-as Block 3.
+Merged as #5: the preset `boost` where `boost` 1.x is listed, shown while any
+thermostat of the room boosts; tested with the fake Cube's `-boost-for`.
 
 ### Block 5: Programmes - done
 
-Merged as #6.
-
-Requires `program_etag` 1.x.
-
-1. `massimo.get_program` (D5): the programme, its ETag, `pending`,
-   `program_consistent`.
-2. `massimo.set_program` with `If-Match` (D11), checked as Massimo checks it;
-   `massimo.copy_program`.
-3. `program_changed` on the room's `climate`, from the `config` event's
-   `changed` and `etag`.
-4. Schemas in `probatio`, `services.yaml`, texts; tests, a `412` included.
-
-**Verification:**
-as Block 3.
+Merged as #6: `massimo.get_program`, `set_program` with `If-Match`,
+`copy_program`, `program_changed` from the `config` event; a `412` tested.
 
 ### Block 6: Brand images - done
 
-Merged as #7.
+Merged as #7: the eight images of Massimo's tool
+(`--flavour grayorange --scope homeassistant`) in
+`custom_components/massimo/brand/`, tested for names and sizes;
+`CONTRIBUTING.md` says how to make them again.
 
-1. **Massimo** (its own plan, on `claude/web-brand`, a pull request stacked
-   on it): the tool's `homeassistant` scope writes the images trimmed to the
-   mark - the icon a square on the mark's wider side, the logo without a
-   margin.
-2. **Here:** the eight images Massimo's tool writes with
-   `--flavour grayorange --scope homeassistant` in
-   `custom_components/massimo/brand/`.
-3. **A test** that Home Assistant's loader finds the integration's brand
-   images, and that they have the names and sizes the brand rules ask.
-4. **`CONTRIBUTING.md`:** where the images come from, and how to make them
-   again.
-5. **CHANGELOG fragment** under `Added`.
+### Block 7: Card - done
 
-**Verification:**
-the test gate and lint of the contract; hassfest.
+Merged as #8: the signed-in view `/api/massimo/ui/{name}`, the card
+`massimo-week-program-card` with Massimo's element and a kit of native
+controls, its editor, its registration on every page, tests.
+Where it differs: `massimo.get_program` also names the device the programme
+was read from (`source`), which the card shows as Massimo's page does.
+The check by hand (D24-A) ran on Home Assistant 2026.10.4 with
+`home-assistant-frontend` 20260930.5, against Massimo's `main` and the fake
+Cube, dark theme, English, in two frames of 1100 and 390 px on one page:
+reading, editing and sending, a change made meanwhile loaded or, with an
+edit held, refused with the edit kept and a reload offered, the phone layout
+without sideways scrolling, the card picker and its editor.
+Not checked by hand: the light theme, a language other than English.
 
-### Block 7: Card
+### Block 8: Distribution - done
 
-1. **The view** `/api/massimo/ui/{name}`, signed in (D22-A):
-   `week-program.js` and `i18n/<lang>.json` from the Massimo server of the
-   entry an `entity_id` names, else the first, kept per Massimo version;
-   any other name, and a file the server has not, `404`.
-2. **The card** `massimo-week-program-card`, plain JavaScript without a
-   build, in `custom_components/massimo/frontend/`:
-   a room's `climate` in its configuration;
-   Massimo's element and texts loaded once per page, by Home Assistant's
-   language, else English;
-   the kit of native elements and `ha-switch`, styled by the card's CSS in
-   Home Assistant's theme variables;
-   the programme read with `massimo.get_program`;
-   **Send** writes the changed days, checked as Massimo's page checks them,
-   with `massimo.set_program` and the tag;
-   a programme changed meanwhile keeps the edits and offers **Reload**;
-   read again by itself when `program_tag` changes and nothing is edited.
-3. **Its editor** by `getConfigForm`: the room's `climate`, of this
-   integration; the card listed in the card picker (`window.customCards`).
-4. **The integration serves** the card's script on a static path and loads
-   it on every page (`add_extra_js_url`) where the frontend runs;
-   `manifest.json` names `http` as a dependency and `frontend` after it.
-5. **Tests:** the view's files, signed in and refused without; a name it
-   does not serve; the card's script served; the script registered with a
-   frontend.
-6. **The check by hand** (D24-A): a scratch Home Assistant 2026.10.4 with
-   `home-assistant-frontend` 20260930.5, against the fake Cube, the card on a
-   dashboard, at 1100 and 390 px: reading, editing, sending, a change made
-   meanwhile, the editor.
-7. **CHANGELOG fragment**, `README.md`.
+Merged as #10, with #11 (the release's environment keys, D59-A) and #12
+(the guidelines with actionlint, D60-A): `tools/dist.py` and its tests,
+`release.yml` called by `ci.yml` once every check passed, signed zips and
+`distro/<channel>` commits, the site at `ha.massimo.metaworx.ch`,
+`README.md` and `CONTRIBUTING.md`.
+Where it differs:
 
-**Verification:**
-as Block 3, and the check by hand.
+- The zip is signed itself, kept in its branch as `.distro/massimo.zip.sig`,
+  so that the site can check a zip it makes again; a release also carries
+  `SHA256SUMS` and, since D59-A, `SHA256SUMS.sig`.
+- The tests against Massimo's newest release are a second entry of the test
+  job's matrix, for a tag's run alone.
+- CI's HACS check keeps `ignore: topics` alone; the contract rose to v1.2.0
+  (`tools/`, `site/` and `keys/` among the source directories, the release
+  by CI, `tools` linted).
+- actionlint was not run then; the workflows were parsed and their steps run
+  by hand.
 
-### Block 8: Distribution
+Made on GitHub: the environments `signing` (version tags, the owner
+approves), `signing-rolling` (`main`), and `github-pages` admitting the same
+tags beside `main`; `SIGNING_KEY` in each, `DISTRO_DEPLOY_KEY` in both; the
+deploy key for `distro/*`; the rulesets "distro/* branches: written by
+release.yml alone" and, by D58-A, "main: checks before merge".
+`release.yml`'s first run on `main` stopped at signing, `ci.yml` calling it
+without `secrets: inherit`; #11 fixed it.
 
-1. **`tools/dist.py`**, without dependencies beyond Python:
-   - `meta`: from a version tag, its version, channel (D45) and whether it
-     is a pre-release, the tag checked against `manifest.json`;
-     from `main`, devel, the version `<last tag>-dev.<n>+g<sha>`
-     (`0.0.0` before the first tag);
-   - `build`: the tree - `custom_components/massimo/` with that version
-     in its `manifest.json`, and `LICENSE` - and `massimo.zip` of it,
-     stored, sorted, dated 1980: the same tree gives the same bytes;
-   - `zip`: the zip of a tree, for the site;
-   - `targets`: the channels a release goes to, its own and each less
-     stable one that holds an older version; devel alone for `main`.
-2. **Tests** of `dist.py` (`tests/test_dist.py`): the channels, the
-   versions Home Assistant's loader takes, the order of versions,
-   the same bytes twice, the manifest's version.
-3. **Keys** (D46, D51-A), each `ssh-keygen -t ed25519` in `~/.ssh`, its
-   private half piped into `gh secret set`:
-   `massimo-homeassistant-release` (environment `signing`),
-   `massimo-homeassistant-rolling` (`signing-rolling`),
-   `massimo-homeassistant-distro`, the deploy key that pushes `distro/*`
-   (both); the public halves in `keys/`, and `keys/allowed_signers`
-   naming the release and rolling keys for `git` and `file`.
-4. **Environments:** `signing`, for `v*` tags alone, its runs approved by
-   the owner; `signing-rolling`, for `main` alone; `github-pages` admitting
-   `v*` tags beside `main`.
-   **Ruleset** on `distro/*`: no deletion, no force push, creation and
-   update by a deploy key alone.
-5. **`.github/workflows/release.yml`**, called by `ci.yml` for a push of
-   `main` or a `v*` tag once every check has passed:
-   `build` (no secret) runs `dist.py`, attests the zip's provenance;
-   `sign` (in `signing` or `signing-rolling`) signs the zip, checks the
-   signature against `keys/allowed_signers`, makes the GitHub release of
-   a tag (the zip, its signature, `SHA256SUMS`, the notes from
-   `changelog.sh notes`, `--prerelease` by D45), and writes each target
-   channel's `distro/<channel>` commit - the tree and `.distro/` with the
-   version, the source commit and the zip's signature - signed, on top of
-   the branch, pushed with the deploy key;
-   then the site.
-   `ci.yml`: pushes of `v*` tags; a tag's tests also against Massimo's
-   newest release.
-6. **The site** (D50, D52-A): `site/` with Massimo's `site.css`, a home
-   page, a privacy page and `build.sh`, which builds it without state:
-   the README as a page by `md_html.py`, `keys/`, and per channel
-   `distro/<channel>.zip` and `.zip.sig`, each zip made again from its
-   branch and checked against the signature there;
-   `.github/workflows/site.yml` deploys it to Pages.
-7. **Documents:** `README.md`, installing by channel and checking a
-   download; `CONTRIBUTING.md`, "Cutting a release" without the release by
-   hand, and the keys.
+### Block 9: Read access - done
 
-**Verification:**
-the test gate and lint of the contract; hassfest; `actionlint` where at
-hand; `site/build.sh` and `dist.py` run locally against a local
-`distro/*`; a signature made and checked with a throw-away key.
-The workflows run first when the branch is pushed and merged.
-
-### Block 9: Read access
-
-1. `massimo.get_program` registered by the integration (D53-A), no longer
-   by the `climate` platform: the same name, a `target` of room `climate`s,
-   `SupportsResponse.ONLY`, the answer `{entity_id: {...}}` as before.
-   A non-admin caller needs `read` on each entity named, else
-   `Unauthorized`; a call without a user goes through.
-   An entity that is not a room's `climate` of this integration is refused,
-   translated.
-2. `massimo.copy_program` checks `read` on its `source` for a non-admin
-   caller (D54-A); `control` on its target stays Home Assistant's check.
-3. `services.yaml` unchanged in what it offers; the refusal's text in
-   `en.json`, `de.json` and `strings.json`.
-4. **Tests**, against the fake Cube: a read-only user reads a programme
-   through the WebSocket's `call_service` as the card calls it, and is
-   refused `set_program`; a user who may not read a room is refused
-   `get_program` and a `copy_program` from it; a call without a user and an
-   admin's read as before.
-5. **CHANGELOG fragment** under `Added`.
-
-**Verification:**
-the test gate, ruff, hassfest.
+Merged as #9: `massimo.get_program` a service of the integration checking
+`read` on each room for a non-admin caller (D53-A), `copy_program` checking
+`read` on its source (D54-A), the refusal translated, tested with a
+read-only user and a user without read on a room.
 
 ### Block 10: Breno trial
 
-1. As `pi` on `pi.breno.caleon.ch` (D38): `distro/devel` cloned into
-   `/srv/homeassistant/config/custom_components/massimo`, its commit's
-   signature checked; `sudo docker restart homeassistant`.
-2. The owner makes a key of the role `integration` in Massimo and enters
-   it in Home Assistant's setup; the entry found by zeroconf or named.
+1. **Done** (2026-11-14, D38, D62-A): `distro/devel` cloned as `pi` into
+   `/srv/homeassistant/config/custom_components/massimo`, the folder made
+   with `sudo install -d -o pi -g pi`; its commit's signature checked against
+   `keys/allowed_signers` (good, `rolling@ha.massimo.metaworx.ch`);
+   Home Assistant 2026.11.0 loads `massimo` without an error.
+   The trial halted there that day, until it was settled which Massimo, and
+   which user, Home Assistant signs in to; it resumed on 2026-11-15, the
+   clone pulled to `0.0.0-dev.56+ge80d339`.
+2. **Done** (2026-11-15): Home Assistant registered with the Pi's Massimo
+   through the setup flow's Register, which collects a key of the role
+   `integration` once the owner approves the request in Massimo.
+   The owner had first added the
+   server by its URL; since #15 a typed address is kept when the server is
+   found again.
 3. Checked: the Cube, the devices, the rooms and their `climate`s,
    a setpoint from Home Assistant seen in Massimo's log, the card on a
    dashboard.
@@ -573,8 +520,8 @@ as step 3.
    `zip_release` and `filename: massimo.zip`;
    the repository's topics; CI's HACS check without `ignore`.
 2. `README.md`: the Marketplace and HACS (Pre-release on, D45).
-3. Waits for Massimo's next tagged release with `features`:
-   the tag's tests run against it.
+3. Massimo's tagged release with `features`, which the tag's tests run
+   against: v0.16.0-alpha.1 (2026-11-15), against which the suite passes.
 4. The cut of 0.1.0 (D34-A) on a branch, its pull request (D35-A);
    after the merge, the tag pushed at a gate of its own; CI releases.
 5. The catalog pull request's text for the owner.
@@ -593,34 +540,22 @@ Home Assistant starts without `maxcube`; the rooms as in Block 10.
 
 ## Proposed commit message
 
-For the revision, committed on its own before Block 9:
+For this revision, with the retirement of the plans that passed users on
+and polished the setup, and the NOTEs it folds in:
 
 ```
-chore(aps): +Integration v1.7
+chore(aps): -OnBehalf, -SetupPolish, +Integration v1.8, -NOTE Integration
 
-A view-only user reads a room's week programme: read access becomes Block 9, before the trial and the release.
+Two plans retire, all their work merged; AP Integration reads alone again, its NOTEs and what the two plans built folded in.
 
 Key changes:
-- Block 9: get_program a service of the integration that checks read; copy_program checks read on its source
-- Blocks 9 to 11 of v1.6 move to 10 to 12
-- D53, D54 as recommended; D55-B, D56, D57-B as the owner gave them: passing users on to Massimo waits for its integration feature
+- -OnBehalf: its four blocks merged as #14, with its NOTE
+- -SetupPolish: its four blocks merged as #15, its display-name NOTE as #16, with both NOTEs
+- Integration v1.8: Blocks 8 and 9 done, Block 10 resumed with steps 1 and 2 done, Block 11's wait for a Massimo with features over
+- D56 and D57 as since built and superseded; D58 to D62 from their NOTE
+- the nine NOTEs of v1.2 to v1.7 folded in and removed, those of how a run went among them, at the owner's word
 
-File-revision-v1: GUIDELINES/wip/2026-11-12_16-45_AP_Integration_entities_services_card_release.md::v1.7::2026-11-14::TL;DR, Discussion, Analysis, Implementation Plan, Proposed commit message, Change History::read access as Block 9; D53 to D57
-Assisted-by: claude-code:claude-opus-5-5
-```
-
-For Block 9:
-
-```
-fix(integration): A view-only user reads a room's week programme
-
-massimo.get_program needed control, as every entity service does, so a user who may only view a room could not open its programme, nor use the card. It is now a service of the integration that checks read on each room it names; copy_program also checks read on the room it copies from.
-
-Key changes:
-- get_program registered by the integration, its name, target and answer as before
-- copy_program refuses a source the user may not read
-- tests with a read-only user and a user without read on a room
-
+File-revision-v1: GUIDELINES/wip/2026-11-12_16-45_AP_Integration_entities_services_card_release.md::v1.8::2026-11-17::TL;DR, Discussion, Analysis, Implementation Plan, Proposed commit message, Change History::the NOTEs and the two plans' work folded in
 Assisted-by: claude-code:claude-opus-5-5
 ```
 
@@ -681,3 +616,20 @@ Assisted-by: claude-code:claude-opus-5-5
   Passing users on to Massimo left to a plan of its own, after Massimo's
   `integration` feature (D55-B, D56, D57-B).
   Written on the unpushed v1.6 at the owner's word, not on `main` (D31-A).
+- v1.8 (2026-11-17): the plan reads alone again, at the owner's word.
+  Folded: NOTE Integration v1.2: Block 1 on the rooms fixture;
+  NOTE Integration v1.2: Home Assistant 2026.11;
+  NOTE Integration v1.3: how Blocks 3 and 4 went;
+  NOTE Integration v1.5: how Block 7 went;
+  NOTE Integration v1.6: how Block 8 went;
+  NOTE Integration v1.7: Massimo asked, and block numbers;
+  NOTE Integration v1.7: decisions D58 to D60;
+  NOTE Integration v1.7: breno trial halted;
+  NOTE Integration v1.7: climate's native temperatures.
+  Blocks 8 and 9 done (#9 to #12), D61-A done (#13); D56 as built and D57
+  superseded (#14); the setup's work of #15 and #16 where it touches the
+  trial; Block 10 resumed, steps 1 and 2 done; Block 11's step 3 met by
+  Massimo v0.16.0-alpha.1. Done blocks shortened to what they built and where
+  they differed from their steps; their steps stay in git's history.
+  The analysis brought up to date: the features, Home Assistant 2026.11,
+  the Pi, the tests' Massimo build and user names.
