@@ -17,7 +17,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.massimo.api import MassimoConnectionError, StreamEvent
 from custom_components.massimo.const import DOMAIN
 
-from .conftest import Server, http, rooms, set_state
+from .conftest import Server, http, integration_users, rooms, set_state
 
 
 async def _setup(hass: HomeAssistant, server: Server) -> MockConfigEntry:
@@ -144,22 +144,28 @@ async def test_the_key_lock_writes_through_massimo(
     assert hass.states.get(lock).state == STATE_OFF
 
     def locks() -> list[dict]:
-        # A call no user started acts as the integration's system user.
-        url = f"{massimo_server.url}/api/v1/audit?user=homeassistant.system&limit=50"
+        # A call no user started acts for the integration's system user.
+        url = f"{massimo_server.url}/api/v1/audit?limit=50"
         rows = http("GET", url, massimo_server.owner)
-        return [r for r in rows if r["action"] == "device.lock"]  # type: ignore[union-attr]
+        return [r for r in rows if r["action"] == "device.lock" and r["detail"].get("for", {}).get("id") == "system"]  # type: ignore[union-attr]
 
-    before = len(await hass.async_add_executor_job(locks))
+    before = {r["id"] for r in await hass.async_add_executor_job(locks)}
     for service, locked, shown in (("turn_on", True, STATE_ON), ("turn_off", False, STATE_OFF)):
         await hass.services.async_call("switch", service, {"entity_id": lock}, blocking=True)
         rows = await hass.async_add_executor_job(locks)
         assert rows[0]["target"] == f"device:{thermostat['serial']}"
         assert rows[0]["detail"]["body"] == {"locked": locked}
         assert rows[0]["result"] == "ok"
-        assert rows[0]["detail"]["via"] == "homeassistant"
+        # the integration, by its uuid since Massimo's migration 0024
+        assert rows[0]["detail"]["via"] in ("homeassistant", massimo_server.integration)
         assert rows[0]["detail"]["for"]["id"] == "system"
         await _until(hass, lambda shown=shown: hass.states.get(lock).state == shown, f"the switch shows {shown}")
-    assert len(await hass.async_add_executor_job(locks)) == before + 2
+    rows = [r for r in await hass.async_add_executor_job(locks) if r["id"] not in before]
+    assert len(rows) == 2
+    # as the system user, by the name Massimo gives it: homeassistant.system
+    # before Massimo's migration 0024, "<uuid>:system" since.
+    system = next(u["user"] for u in integration_users(massimo_server) if u["id"] == "system")
+    assert {r["user"] for r in rows} == {system}
     await _unload(hass, entry)
 
 
